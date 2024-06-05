@@ -1,0 +1,15 @@
+#pragma once
+#include "stdafx.h"
+
+class Player
+{
+public:
+	int				id;
+	int				hp;
+	int				max_hp;
+	int				exp;
+	int				level;
+	short			x, y;
+	char			dir;
+};
+

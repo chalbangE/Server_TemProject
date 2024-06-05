@@ -1,0 +1,389 @@
+#if defined(DEBUG) | defined(_DEBUG) 
+#pragma comment(linker, "/entry:WinMainCRTStartup /subsystem:console") 
+#endif
+#pragma once
+
+#include "protocol.h"
+#include "../SERVER/Tem_server/Tem_server/OVER_PLUS.h"
+#include "Player.h"
+	// #include "stdafx.h"
+using namespace std;
+
+extern bool bshutdown; // 종료 조건 변수
+static void print_error(const char* msg, int err_no);
+
+HINSTANCE g_hinst;
+LPCTSTR IpszClass = L"Window Programming Lap";
+LPCTSTR IpszWindowName = L"Window Programming Lap";
+
+LRESULT CALLBACK WndProc(HWND hEnd, UINT iMessage, WPARAM wParam, LPARAM IParam);
+
+short WIN_SIZE = 840;
+short TILE_NUMBER = 21;
+short TILE_SIZE = WIN_SIZE / TILE_NUMBER;
+short TILE_IMG_SIZE = (WIN_SIZE / TILE_NUMBER) * 2;
+
+constexpr char SERVER_ADDR[] = "127.0.0.1";
+
+int								my_id;
+int								my_x, my_y;
+int								my_exp, my_level;
+short							my_motion;
+unordered_map <int, Player>		players;
+SOCKET							send_socket, server_soket;
+WSAOVERLAPPED					wsaover; 
+WSABUF							recv_wsabuf[1]{}, send_wsabuf[1]{};
+
+void Client_Login();
+void Send_Packet(void* packet);
+void CALLBACK send_callback(DWORD err, DWORD sent_size, LPWSAOVERLAPPED pwsaover, DWORD sendflag);
+void Recv_Packet(char* recv_buf, size_t recv_size);
+void CALLBACK recv_callback(DWORD err, DWORD recv_size, LPWSAOVERLAPPED pwsaover, DWORD sendflag);
+void Using_Packet(char* packet);
+
+int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevinstance, LPSTR IpszCmdParam, int nCmdShow)
+{ 
+	// ------- 서버 붙이기 -------------------
+	std::wcout.imbue(std::locale("korean")); // 한글로 오류 출력
+
+	WSADATA WSAData{};
+	int err = WSAStartup(MAKEWORD(2, 2), &WSAData);
+	if (0 != err) {
+		print_error("WSAStartup", WSAGetLastError());
+	}
+
+	server_soket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, WSA_FLAG_OVERLAPPED);
+	SOCKADDR_IN server_addr;
+	server_addr.sin_family = AF_INET;
+	server_addr.sin_port = htons(PORT_NUM);
+	inet_pton(AF_INET, SERVER_ADDR, &server_addr.sin_addr);
+
+	connect(server_soket, reinterpret_cast<sockaddr*>(&server_addr), sizeof(server_addr));
+
+
+	// ------ 윈프 초기설정 ---------------
+
+	HWND hWnd;
+	MSG Message;
+	WNDCLASSEX WndClass;
+	g_hinst = hinstance;
+
+	WndClass.cbSize = sizeof(WndClass);
+	WndClass.style = CS_HREDRAW | CS_VREDRAW;
+	WndClass.lpfnWndProc = (WNDPROC)WndProc;
+	WndClass.cbClsExtra = 0;
+	WndClass.cbWndExtra = 0;
+	WndClass.hInstance = hinstance;
+	WndClass.hIcon = LoadIcon(NULL, IDI_APPLICATION);
+	WndClass.hCursor = LoadCursor(NULL, IDC_ARROW);
+	WndClass.hbrBackground = (HBRUSH)GetStockObject(WHITE_BRUSH);
+	WndClass.lpszMenuName = NULL;
+	WndClass.lpszClassName = IpszClass;
+	WndClass.hIconSm = LoadIcon(NULL, IDI_APPLICATION);
+	RegisterClassEx(&WndClass);
+
+	hWnd = CreateWindow(IpszClass, L"TemProject", WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_BORDER | WS_MINIMIZEBOX | WS_MAXIMIZEBOX, 0, 0, 
+		WIN_SIZE, WIN_SIZE, NULL, (HMENU)NULL, hinstance, NULL);
+	ShowWindow(hWnd, nCmdShow);
+	UpdateWindow(hWnd);
+
+	while (GetMessage(&Message, 0, 0, 0)) {
+		TranslateMessage(&Message);
+		DispatchMessage(&Message);
+	}
+
+	return Message.wParam;
+}
+
+LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
+{
+	srand(time(NULL));
+
+	PAINTSTRUCT ps;
+	HDC hdc{}; HDC mdc{};
+	HBITMAP HBitmap, OldBitmap;
+	HPEN hPen, oldPen;
+	RECT window{ 0, 0, 840, 840 };
+	char recv_buf[CHAT_SIZE];
+	size_t recv_size;
+
+	static CImage bg_tile_img, ch_img, npc_img;
+
+	// 메세지 처리하기
+	switch (uMsg) {
+	case WM_CREATE: {
+		AdjustWindowRect(&window, WS_OVERLAPPEDWINDOW, false);         
+		MoveWindow(hWnd, 150, 70, window.right - window.left, window.bottom - window.top, false);
+
+		bg_tile_img.Load(TEXT("IMG/Tile.png"));
+		ch_img.Load(TEXT("IMG/Ham_sprite76-76.png"));
+		npc_img.Load(TEXT("IMG/HamNPC_sprite76-76.png"));
+
+		players[MAX_USER].id = MAX_USER;
+		players[MAX_USER].x = players[MAX_USER].y = 3;
+		players[0].x = players[MAX_USER].y = 3;
+
+		Client_Login();
+
+		SetTimer(hWnd, 1, 200, 0);
+		InvalidateRect(hWnd, NULL, FALSE);
+		break;
+	}
+	case WM_SIZE:
+	case WM_MOVE: {
+
+		InvalidateRect(hWnd, NULL, FALSE);
+		break;
+	}
+	case WM_PAINT: {
+		hdc = BeginPaint(hWnd, &ps);
+		mdc = CreateCompatibleDC(hdc);
+		HBitmap = CreateCompatibleBitmap(hdc, window.right, window.bottom);
+		OldBitmap = (HBITMAP)SelectObject(mdc, (HBITMAP)HBitmap);
+		FillRect(mdc, &window, 0);
+
+		// 배경 타일 깔기
+		{
+			if (my_x % 2 == my_y % 2) {
+				for (int i = 0; i < (TILE_NUMBER / 2) + 1; ++i) {
+					for (int k = 0; k < (TILE_NUMBER / 2) + 1; ++k)
+						bg_tile_img.Draw(mdc, i * TILE_IMG_SIZE, k * TILE_IMG_SIZE, TILE_IMG_SIZE, TILE_IMG_SIZE, 0, 0, TILE_IMG_SIZE, TILE_IMG_SIZE);
+				}
+			}
+			else {
+				for (int i = 0; i < (TILE_NUMBER / 2) + 1; ++i) {
+					for (int k = 0; k < (TILE_NUMBER / 2) + 1; ++k) {
+						if (i == 0) {
+							bg_tile_img.Draw(mdc, i, (k * TILE_IMG_SIZE) - TILE_SIZE,
+								TILE_SIZE, TILE_IMG_SIZE,
+								0, 0,
+								TILE_SIZE, TILE_IMG_SIZE);
+							continue;
+						}
+						bg_tile_img.Draw(mdc, (i * TILE_IMG_SIZE) - TILE_SIZE, (k * TILE_IMG_SIZE), TILE_IMG_SIZE, TILE_IMG_SIZE, 0, 0, TILE_IMG_SIZE, TILE_IMG_SIZE);
+					}
+				}
+			}
+
+			hPen = CreatePen(PS_SOLID, 1, RGB(255, 255, 255));
+			oldPen = (HPEN)SelectObject(mdc, hPen);
+			if (my_x < TILE_NUMBER / 2 || my_y < TILE_NUMBER / 2) {
+				Rectangle(mdc, 0, 0, ((TILE_NUMBER / 2) - my_x) * TILE_SIZE, WIN_SIZE); // 세로 네모
+				Rectangle(mdc, 0, 0, WIN_SIZE, ((TILE_NUMBER / 2) - my_y) * TILE_SIZE); // 가로 네모
+			}
+			if ((W_WIDTH - my_x) <= (TILE_NUMBER / 2) || (W_HEIGHT - my_y) <= (TILE_NUMBER / 2)) {
+				Rectangle(mdc, ((WIN_SIZE / 2) + (W_WIDTH - my_x) * TILE_SIZE) + (TILE_SIZE / 2), 0, WIN_SIZE, WIN_SIZE); // 세로 네모
+				Rectangle(mdc, 0, ((WIN_SIZE / 2) + (W_HEIGHT - my_y) * TILE_SIZE) + (TILE_SIZE / 2), WIN_SIZE, WIN_SIZE); // 세로 네모
+			}
+			SelectObject(mdc, oldPen);
+			DeleteObject(hPen);
+		}
+
+		// 햄스터 그리기 (플레이어)
+		for (const auto& p : players) {
+			if (p.second.id >= MAX_USER)
+				npc_img.Draw(mdc, ((10 - (my_x - p.second.x)) * (TILE_SIZE)) + 5, ((10 - (my_y - p.second.y)) * (TILE_SIZE)) + 5, TILE_SIZE - 10, TILE_SIZE - 10, my_motion * 76, 0, 76, 76);
+			else
+				ch_img.Draw(mdc, ((10 - (my_x - p.second.x)) * (TILE_SIZE)) + 5, ((10 - (my_y - p.second.y)) * (TILE_SIZE)) + 5, TILE_SIZE - 10, TILE_SIZE - 10, my_motion * 76, 0, 76, 76);
+		}
+
+		BitBlt(hdc, 0, 0, window.right, window.bottom, mdc, 0, 0, SRCCOPY);
+
+		DeleteDC(mdc);
+		EndPaint(hWnd, &ps);
+		break;
+	}
+	case WM_TIMER: {
+		++my_motion;
+		if (my_motion > 3)
+			my_motion = 0;
+
+		InvalidateRect(hWnd, NULL, FALSE);
+		break;
+	}
+	case WM_KEYDOWN: {
+		//direction |  // 0 : UP, 1 : DOWN, 2 : LEFT, 3 : RIGHT
+		short direction = -1;
+
+		switch (wParam) {
+		case 'w': 
+		case 'W': {
+			direction = 0;
+			break;
+		}
+		case 's':
+		case 'S': {
+			direction = 1;
+			break;
+		}
+		case 'a':
+		case 'A': {
+			direction = 2;
+			break;
+		}
+		case 'd':
+		case 'D': {
+			direction = 3;
+			break;
+		}
+		}
+
+		if (-1 != direction) {
+			CS_MOVE_PACKET p;
+			p.size = sizeof(p);
+			p.type = CS_MOVE;
+			p.direction = direction;
+
+			Send_Packet(&p);
+		}
+		InvalidateRect(hWnd, NULL, FALSE);
+		break;
+	}
+	case WM_DESTROY: {
+		WSACleanup();
+		PostQuitMessage(0);
+		break;
+	}
+	default:
+		break;
+	}
+
+	return DefWindowProc(hWnd, uMsg, wParam, IParam);
+}
+
+void Client_Login()
+{
+	CS_LOGIN_PACKET p;
+	p.size = sizeof(p);
+	p.type = CS_LOGIN;
+	p.name[0] = 'Y';
+
+	Send_Packet(&p);
+}
+
+void Recv_Packet(char* recv_buf, size_t recv_size)
+{
+	OVER_PLUS* sdata = new OVER_PLUS{ reinterpret_cast<char*>(recv_buf) };
+	int res = WSARecv(server_soket, &sdata->_wsabuf, 1, 0, 0, &sdata->_over, recv_callback);
+	if (0 != res) {
+		int err_no = WSAGetLastError();
+		// 에러 겹친 i/o 작업을 진행하고 있습니다. 라고 나오는 게 정상임
+		if (WSA_IO_PENDING != err_no)
+			print_error("Recv_Packet - WSASend", WSAGetLastError());
+	}
+}
+void CALLBACK recv_callback(DWORD err, DWORD recv_size, LPWSAOVERLAPPED pwsaover, DWORD sendflag)
+{
+	OVER_PLUS* over = reinterpret_cast<OVER_PLUS*>(pwsaover);
+
+	static size_t save_data_size = 0;
+	static size_t one_packet_size = 0;
+	static char save_buf[CHAT_SIZE];
+	char* buf = over->_wsabuf.buf;
+	char recv_buf[CHAT_SIZE];
+
+	if (save_data_size > 0) { // 전에 잘려서 저장해둔 패킷이 있으면 그거부터 하기
+		memcpy(recv_buf, save_buf, save_data_size);
+		memcpy(&recv_buf[save_data_size], buf, one_packet_size - save_data_size);
+		buf += one_packet_size - save_data_size;
+		recv_size -= one_packet_size - save_data_size;
+		save_data_size = 0;
+		Using_Packet(recv_buf);
+	}
+
+	while (1) {
+		if (recv_size == 0) break; // 남은 데이터가 없으면 끝
+		one_packet_size = buf[0]; // 패킷 하나 사이즈 등록하기
+		if (one_packet_size > recv_size) { // 패킷 하나 사이즈보다 남은 버퍼 크기가 더 작으면 잘린거니까 save하기
+			memcpy(save_buf, buf, recv_size);
+			save_data_size = recv_size;
+			break;
+		}
+		memcpy(recv_buf, buf, one_packet_size);
+		Using_Packet(recv_buf);
+		buf += one_packet_size;
+		recv_size -= one_packet_size;
+	}
+
+	delete over;
+}
+
+void Using_Packet(char* packet_ptr)
+{
+	switch (packet_ptr[1])
+	{
+	case SC_LOGIN_INFO: {
+		SC_LOGIN_INFO_PACKET* packet = reinterpret_cast<SC_LOGIN_INFO_PACKET*>(packet_ptr);
+
+		my_id = packet->id;
+		my_x = packet->x;
+		my_y = packet->y;
+
+		players[my_id].id = packet->id;
+		players[my_id].hp = packet->hp;
+		players[my_id].max_hp = packet->max_hp;
+		players[my_id].exp = packet->exp;
+		players[my_id].level = packet->level;
+		players[my_id].x = packet->x;
+		players[my_id].y = packet->y;
+
+		break;
+	}
+	case SC_LOGIN_FAIL: {
+		cout << "로그인 실패!!!!" << endl;
+		break;
+	}
+	case SC_ADD_OBJECT: {
+		break;
+	}
+	case SC_REMOVE_OBJECT: {
+		break;
+	}
+	case SC_MOVE_OBJECT: {
+		SC_MOVE_OBJECT_PACKET* packet = reinterpret_cast<SC_MOVE_OBJECT_PACKET*>(packet_ptr);
+
+		players[packet->id].x = packet->x;
+		players[packet->id].y = packet->y;
+
+		break;		   
+	}
+	case SC_CHAT: {
+		break;
+	}
+	case SC_STAT_CHANGE: {
+		break;
+	}
+	default:
+		break;
+	}
+}
+
+void Send_Packet(void* packet)
+{
+	OVER_PLUS* sdata = new OVER_PLUS{ reinterpret_cast<char*>(packet) };
+	int sed = WSASend(server_soket, &sdata->_wsabuf, 1, 0, 0, &sdata->_over, send_callback);
+	if (0 != sed) {
+		int err_no = WSAGetLastError();
+		// 에러 겹친 i/o 작업을 진행하고 있습니다. 라고 나오는 게 정상임
+		if (WSA_IO_PENDING != err_no)
+			print_error("Send_Packet - WSASend", WSAGetLastError());
+	}
+}
+void CALLBACK send_callback(DWORD err, DWORD sent_size, LPWSAOVERLAPPED pwsaover, DWORD sendflag)
+{
+	OVER_PLUS* over = reinterpret_cast<OVER_PLUS*>(pwsaover);
+	delete over;
+}
+
+static void print_error(const char* msg, int err_no)
+{
+	WCHAR* msg_buf{};
+	FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
+		NULL, err_no,
+		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+		reinterpret_cast<LPWSTR>(&msg_buf), 0, NULL);
+	std::cout << msg;
+	std::wcout << L"\t에러 : " << msg_buf;
+	while (true);
+	LocalFree(msg_buf);
+}
