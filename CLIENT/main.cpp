@@ -31,13 +31,13 @@ int								my_exp, my_level;
 short							my_motion;
 unordered_map <int, Player>		players;
 SOCKET							send_socket, server_soket;
-WSAOVERLAPPED					wsaover; 
-WSABUF							recv_wsabuf[1]{}, send_wsabuf[1]{};
+WSAOVERLAPPED					wsaover;
+
 
 void Client_Login();
 void Send_Packet(void* packet);
 void CALLBACK send_callback(DWORD err, DWORD sent_size, LPWSAOVERLAPPED pwsaover, DWORD sendflag);
-void Recv_Packet(char* recv_buf, size_t recv_size);
+void Recv_Packet();
 void CALLBACK recv_callback(DWORD err, DWORD recv_size, LPWSAOVERLAPPED pwsaover, DWORD sendflag);
 void Using_Packet(char* packet);
 
@@ -90,6 +90,7 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevinstance, LPSTR IpszCmdPa
 	while (GetMessage(&Message, 0, 0, 0)) {
 		TranslateMessage(&Message);
 		DispatchMessage(&Message);
+		SleepEx(16, true);
 	}
 
 	return Message.wParam;
@@ -104,8 +105,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 	HBITMAP HBitmap, OldBitmap;
 	HPEN hPen, oldPen;
 	RECT window{ 0, 0, 840, 840 };
-	char recv_buf[CHAT_SIZE];
-	size_t recv_size;
 
 	static CImage bg_tile_img, ch_img, npc_img;
 
@@ -119,13 +118,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 		ch_img.Load(TEXT("IMG/Ham_sprite76-76.png"));
 		npc_img.Load(TEXT("IMG/HamNPC_sprite76-76.png"));
 
-		players[MAX_USER].id = MAX_USER;
-		players[MAX_USER].x = players[MAX_USER].y = 3;
-		players[0].x = players[MAX_USER].y = 3;
-
 		Client_Login();
 
 		SetTimer(hWnd, 1, 200, 0);
+		//SetTimer(hWnd, 2, 10, 0);
 		InvalidateRect(hWnd, NULL, FALSE);
 		break;
 	}
@@ -172,8 +168,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 				Rectangle(mdc, 0, 0, WIN_SIZE, ((TILE_NUMBER / 2) - my_y) * TILE_SIZE); // 가로 네모
 			}
 			if ((W_WIDTH - my_x) <= (TILE_NUMBER / 2) || (W_HEIGHT - my_y) <= (TILE_NUMBER / 2)) {
-				Rectangle(mdc, ((WIN_SIZE / 2) + (W_WIDTH - my_x) * TILE_SIZE) + (TILE_SIZE / 2), 0, WIN_SIZE, WIN_SIZE); // 세로 네모
-				Rectangle(mdc, 0, ((WIN_SIZE / 2) + (W_HEIGHT - my_y) * TILE_SIZE) + (TILE_SIZE / 2), WIN_SIZE, WIN_SIZE); // 세로 네모
+				Rectangle(mdc, ((WIN_SIZE / 2) + (W_WIDTH - my_x) * TILE_SIZE) - (TILE_SIZE / 2), 0, WIN_SIZE, WIN_SIZE); // 세로 네모
+				Rectangle(mdc, 0, ((WIN_SIZE / 2) + (W_HEIGHT - my_y) * TILE_SIZE) - (TILE_SIZE / 2), WIN_SIZE, WIN_SIZE); // 세로 네모
 			}
 			SelectObject(mdc, oldPen);
 			DeleteObject(hPen);
@@ -194,9 +190,22 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 		break;
 	}
 	case WM_TIMER: {
-		++my_motion;
-		if (my_motion > 3)
-			my_motion = 0;
+
+		switch (wParam)
+		{
+		case 1: {
+			++my_motion;
+			if (my_motion > 3)
+				my_motion = 0;
+			break;
+		}
+		case 2: {
+			Recv_Packet();
+			break;
+		}
+		default:
+			break;
+		}
 
 		InvalidateRect(hWnd, NULL, FALSE);
 		break;
@@ -257,19 +266,21 @@ void Client_Login()
 	p.size = sizeof(p);
 	p.type = CS_LOGIN;
 	p.name[0] = 'Y';
+	p.name[1] = '\0';
 
 	Send_Packet(&p);
 }
 
-void Recv_Packet(char* recv_buf, size_t recv_size)
+void Recv_Packet()
 {
-	OVER_PLUS* sdata = new OVER_PLUS{ reinterpret_cast<char*>(recv_buf) };
-	int res = WSARecv(server_soket, &sdata->_wsabuf, 1, 0, 0, &sdata->_over, recv_callback);
+	DWORD recv_flag = 0;
+	OVER_PLUS* sdata = new OVER_PLUS();
+	int res = WSARecv(server_soket, &sdata->_wsabuf, 1, 0, &recv_flag, &sdata->_over, recv_callback);
 	if (0 != res) {
 		int err_no = WSAGetLastError();
 		// 에러 겹친 i/o 작업을 진행하고 있습니다. 라고 나오는 게 정상임
 		if (WSA_IO_PENDING != err_no)
-			print_error("Recv_Packet - WSASend", WSAGetLastError());
+			print_error("Recv_Packet - WSARecv", WSAGetLastError());
 	}
 }
 void CALLBACK recv_callback(DWORD err, DWORD recv_size, LPWSAOVERLAPPED pwsaover, DWORD sendflag)
@@ -310,7 +321,7 @@ void CALLBACK recv_callback(DWORD err, DWORD recv_size, LPWSAOVERLAPPED pwsaover
 
 void Using_Packet(char* packet_ptr)
 {
-	switch (packet_ptr[1])
+	switch (packet_ptr[2])
 	{
 	case SC_LOGIN_INFO: {
 		SC_LOGIN_INFO_PACKET* packet = reinterpret_cast<SC_LOGIN_INFO_PACKET*>(packet_ptr);
@@ -334,6 +345,12 @@ void Using_Packet(char* packet_ptr)
 		break;
 	}
 	case SC_ADD_OBJECT: {
+		SC_LOGIN_INFO_PACKET* packet = reinterpret_cast<SC_LOGIN_INFO_PACKET*>(packet_ptr);
+
+		my_x = packet->x;
+		my_y = packet->y;
+		players[my_id].x = packet->x;
+		players[my_id].y = packet->y;
 		break;
 	}
 	case SC_REMOVE_OBJECT: {
@@ -344,6 +361,11 @@ void Using_Packet(char* packet_ptr)
 
 		players[packet->id].x = packet->x;
 		players[packet->id].y = packet->y;
+
+		if (my_id == packet->id) {
+			my_x = packet->x;
+			my_y = packet->y;
+		}
 
 		break;		   
 	}
@@ -373,6 +395,8 @@ void CALLBACK send_callback(DWORD err, DWORD sent_size, LPWSAOVERLAPPED pwsaover
 {
 	OVER_PLUS* over = reinterpret_cast<OVER_PLUS*>(pwsaover);
 	delete over;
+
+	Recv_Packet();
 }
 
 static void print_error(const char* msg, int err_no)

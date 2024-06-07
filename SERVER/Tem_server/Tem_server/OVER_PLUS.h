@@ -23,12 +23,11 @@ public:
 	}
 
 	OVER_PLUS(char* packet) {
-		_wsabuf.len = packet[0];
+		_wsabuf.len = *(unsigned short*)packet;
 		_wsabuf.buf = _send_buf;
 		ZeroMemory(&_over, sizeof(_over));
 		_comp_type = OP_SEND;
-		memcpy(_send_buf, packet, packet[0]);
+		memcpy(_send_buf, packet, _wsabuf.len);
 	}
-
 };
 

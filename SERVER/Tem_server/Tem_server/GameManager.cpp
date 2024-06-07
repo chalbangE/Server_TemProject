@@ -110,7 +110,7 @@ void GameManager::Worker_thread()
 			}
 			ZeroMemory(&accept_over._over, sizeof(accept_over._over));
 			int addr_size = sizeof(SOCKADDR_IN);
-			AcceptEx(server_socket, client_socket, accept_over._send_buf, 0, addr_size + 16, addr_size + 16, 0, &accept_over._over);
+			AcceptEx(server_socket, client_socket, accept_over._send_buf, 0, addr_size + 16, addr_size + 16, 0, &accept_over._over);			
 			break;
 		}
 		case OP_RECV: {
@@ -181,7 +181,7 @@ int GameManager::Get_new_Client_id()
 
 void GameManager::Process_packet(int c_id, char* packet)
 {
-	switch (packet[1]) {
+	switch (packet[2]) {
 	case CS_LOGIN: {
 		CS_LOGIN_PACKET* p = reinterpret_cast<CS_LOGIN_PACKET*>(packet);
 		strcpy_s(clients[c_id]._name, p->name);
