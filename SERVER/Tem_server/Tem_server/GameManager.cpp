@@ -188,7 +188,7 @@ void GameManager::Disconnect(int c_id)
 	}
 	closesocket(clients[c_id]._socket);
 
-	st_mng.SLErase(c_id, clients[c_id].x / S_WIDTH, clients[c_id].y / S_HEIGHT);
+	st_mng.SLErase(&clients[c_id]);
 
 	lock_guard<mutex> ll(clients[c_id]._s_lock);
 	clients[c_id]._state = ST_FREE;
@@ -220,21 +220,21 @@ void GameManager::Process_packet(int c_id, char* packet)
 		int s_x = clients[c_id].x / S_WIDTH;
 		int s_y = clients[c_id].y / S_HEIGHT;
 
-		st_mng.SLInsert(c_id, s_x, s_y);
+		st_mng.SLInsert(&clients[c_id]);
 
 		for (int y = s_y - 1; y < s_y + 2; ++y) {
 			for (int x = s_x - 1; x < s_x + 2; ++x) {
 				if (y < 0 || y >= W_HEIGHT / S_HEIGHT || x < 0 || x >= W_WIDTH / S_WIDTH) continue;
 				st_mng._st_lock[y][x].lock();
-				for (auto& p_id : st_mng.sector_list[y][x]) {
+				for (auto& cl : st_mng.sector_list[y][x]) {
 					{
-						lock_guard<mutex> ll(clients[p_id]._s_lock);
-						if (ST_INGAME != clients[p_id]._state) continue;
+						lock_guard<mutex> ll(cl->_s_lock);
+						if (ST_INGAME != cl->_state) continue;
 					}
-					if (p_id == c_id) continue;
-					if (false == Can_see(c_id, p_id))
+					if (cl->_id == c_id) continue;
+					if (false == Can_see(c_id, cl->_id))
 						continue;
-					clients[c_id].send_add_player_packet(&clients[p_id]);
+					clients[c_id].send_add_player_packet(cl);
 				}
 				st_mng._st_lock[y][x].unlock();
 			}
@@ -257,9 +257,13 @@ void GameManager::Process_packet(int c_id, char* packet)
 		}
 		int s_y = y / S_HEIGHT;
 		int s_x = x / S_WIDTH;
+
 		if (s_x != clients[c_id].x / S_WIDTH || s_y != clients[c_id].y / S_HEIGHT) {
-			st_mng.SLErase(c_id, clients[c_id].x / S_WIDTH, clients[c_id].y / S_HEIGHT);
-			st_mng.SLInsert(c_id, s_x, s_y);
+			st_mng.SLErase(&clients[c_id]);
+
+			clients[c_id].x = x;
+			clients[c_id].y = y;
+			st_mng.SLInsert(&clients[c_id]);
 		}
 
 		unordered_set<int> near_list;
@@ -271,18 +275,18 @@ void GameManager::Process_packet(int c_id, char* packet)
 			for (int x = s_x - 1; x < s_x + 2; ++x) {
 				if (y < 0 || y >= W_HEIGHT / S_HEIGHT || x < 0 || x >= W_WIDTH / S_WIDTH) continue;
 				st_mng._st_lock[y][x].lock();
-				for (auto& p_id : st_mng.sector_list[y][x]) {
-					if (clients[p_id]._state != ST_INGAME) continue;
-					if (p_id == c_id) continue;
-					if (Can_see(c_id, p_id))
-						near_list.insert(p_id);
+				for (auto& cl : st_mng.sector_list[y][x]) {
+					if (cl->_state != ST_INGAME) continue;
+					if (cl->_id == c_id) continue;
+					if (Can_see(c_id, cl->_id))
+						near_list.insert(cl->_id);
 				}
 				st_mng._st_lock[y][x].unlock();
 			}
 		}
+
 		clients[c_id].x = x;
 		clients[c_id].y = y;
-
 		clients[c_id].send_move_packet(&clients[c_id]);
 
 		for (auto& pl : near_list) {
