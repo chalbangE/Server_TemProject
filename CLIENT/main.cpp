@@ -28,6 +28,7 @@ int								my_id = -1;
 int								my_x, my_y;
 int								my_exp, my_level;
 short							my_motion;
+char							my_dir;
 unordered_map <int, Player>		players;
 SOCKET							send_socket, server_soket;
 WSAOVERLAPPED					wsaover;
@@ -118,8 +119,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 
 		bg_tile_img[0].Load(TEXT("IMG/Tile_1.png"));
 		bg_tile_img[1].Load(TEXT("IMG/Tile_2.png"));
-		ch_img.Load(TEXT("IMG/Ham_sprite76-76.png"));
-		npc_img.Load(TEXT("IMG/HamNPC_sprite76-76.png"));
+		ch_img.Load(TEXT("IMG/player28-28.png"));
+		npc_img.Load(TEXT("IMG/npc28-28.png"));
 
 		Client_Login();
 
@@ -165,9 +166,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 			// 햄스터 그리기 (플레이어)
 			for (const auto& p : players) {
 				if (p.second.id >= MAX_USER)
-					npc_img.Draw(mdc, ((10 - (my_x - p.second.x)) * (TILE_SIZE)) + 5, ((10 - (my_y - p.second.y)) * (TILE_SIZE)) + 5, TILE_SIZE - 10, TILE_SIZE - 10, my_motion * 76, 0, 76, 76);
+					npc_img.Draw(mdc, ((10 - (my_x - p.second.x)) * (TILE_SIZE)) + 5, ((10 - (my_y - p.second.y)) * (TILE_SIZE)) + 5, TILE_SIZE - 10, TILE_SIZE - 10, my_motion * 28, int(my_dir) * 28, 28, 28);
 				else
-					ch_img.Draw(mdc, ((10 - (my_x - p.second.x)) * (TILE_SIZE)) + 5, ((10 - (my_y - p.second.y)) * (TILE_SIZE)) + 5, TILE_SIZE - 10, TILE_SIZE - 10, my_motion * 76, 0, 76, 76);
+					ch_img.Draw(mdc, ((10 - (my_x - p.second.x)) * (TILE_SIZE)) + 5, ((10 - (my_y - p.second.y)) * (TILE_SIZE)) + 5, TILE_SIZE - 10, TILE_SIZE - 10, my_motion * 28, int(my_dir) * 28, 28, 28);
 			}
 
 			BitBlt(hdc, 0, 0, window.right, window.bottom, mdc, 0, 0, SRCCOPY);
@@ -197,33 +198,34 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 		break;
 	}
 	case WM_KEYDOWN: {
-		//direction |  // 0 : UP, 1 : DOWN, 2 : LEFT, 3 : RIGHT
-		short direction = -1;
+		//direction |  // 0 : RIGHT, 1 : LEFT, 2 : UP, 3 : DOWN
+		char direction = -1;
 
 		switch (wParam) {
-		case 'w': 
-		case 'W': {
+		case 'd':
+		case 'D': {
 			direction = 0;
-			break;
-		}
-		case 's':
-		case 'S': {
-			direction = 1;
 			break;
 		}
 		case 'a':
 		case 'A': {
+			direction = 1;
+			break;
+		}
+		case 'w': 
+		case 'W': {
 			direction = 2;
 			break;
 		}
-		case 'd':
-		case 'D': {
+		case 's':
+		case 'S': {
 			direction = 3;
 			break;
 		}
 		}
 
 		if (-1 != direction) {
+			my_dir = direction;
 			CS_MOVE_PACKET p;
 			p.size = sizeof(p);
 			p.type = CS_MOVE;
@@ -357,7 +359,7 @@ void Using_Packet(char* packet_ptr)
 			my_y = packet->y;
 		}
 
-		break;		   
+		break;
 	}
 	case SC_CHAT: {
 		SC_CHAT_PACKET* packet = reinterpret_cast<SC_CHAT_PACKET*>(packet_ptr);

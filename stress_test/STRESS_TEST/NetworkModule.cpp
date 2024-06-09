@@ -27,7 +27,7 @@ const static int MAX_BUFF_SIZE = 255;
 
 #pragma comment (lib, "ws2_32.lib")
 
-#include "..\..\SERVER\SERVER\protocol.h"
+#include "../../CLIENT/protocol.h"
 
 HANDLE g_hiocp;
 
@@ -126,7 +126,7 @@ void SendPacket(int cl, void* packet)
 
 void ProcessPacket(int ci, unsigned char packet[])
 {
-	switch (packet[1]) {
+	switch (packet[2]) {
 	case SC_MOVE_OBJECT: {
 		SC_MOVE_OBJECT_PACKET* move_packet = reinterpret_cast<SC_MOVE_OBJECT_PACKET*>(packet);
 		if (move_packet->id < MAX_CLIENTS) {

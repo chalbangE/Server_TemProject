@@ -249,11 +249,12 @@ void GameManager::Process_packet(int c_id, char* packet)
 		clients[c_id].last_move_time = p->move_time;
 		short x = clients[c_id].x;
 		short y = clients[c_id].y;
+		//direction |  // 0 : RIGHT, 1 : LEFT, 2 : UP, 3 : DOWN
 		switch (p->direction) {
-		case 0: if (y > 0) y--; break;
-		case 1: if (y < W_HEIGHT - 1) y++; break;
-		case 2: if (x > 0) x--; break;
-		case 3: if (x < W_WIDTH - 1) x++; break;
+		case 0: if (x < W_WIDTH - 1) x++; break; 
+		case 1: if (x > 0) x--; break; 
+		case 2: if (y > 0) y--; break; 
+		case 3: if (y < W_HEIGHT - 1) y++; break;
 		}
 		int s_y = y / S_HEIGHT;
 		int s_x = x / S_WIDTH;
@@ -312,6 +313,10 @@ void GameManager::Process_packet(int c_id, char* packet)
 			}
 		}
 
+
+		break;
+	}
+	case CS_ATTACK: {
 
 		break;
 	}
