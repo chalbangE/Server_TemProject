@@ -129,6 +129,7 @@
   <ItemGroup>
     <ClCompile Include="OVER_PLUS.cpp" />
     <ClCompile Include="GameManager.cpp" />
+    <ClCompile Include="SectorManager.cpp" />
     <ClCompile Include="SESSION.cpp" />
     <ClCompile Include="Tem_server.cpp" />
     <ClCompile Include="TIMER_EVENT.cpp" />
@@ -145,6 +146,7 @@
     <ClInclude Include="include\lua.hpp" />
     <ClInclude Include="include\luaconf.h" />
     <ClInclude Include="include\lualib.h" />
+    <ClInclude Include="SectorManager.h" />
     <ClInclude Include="SESSION.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="TIMER_EVENT.h" />

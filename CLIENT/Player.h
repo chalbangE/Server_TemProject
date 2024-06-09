@@ -11,5 +11,6 @@ public:
 	int				level;
 	short			x, y;
 	char			dir;
+	char			name[NAME_SIZE];
 };
 

@@ -3,7 +3,6 @@
 #endif
 #pragma once
 
-#include "protocol.h"
 #include "../SERVER/Tem_server/Tem_server/OVER_PLUS.h"
 #include "Player.h"
 	// #include "stdafx.h"
@@ -25,7 +24,7 @@ short TILE_IMG_SIZE = (WIN_SIZE / TILE_NUMBER) * 2;
 
 constexpr char SERVER_ADDR[] = "127.0.0.1";
 
-int								my_id;
+int								my_id = -1;
 int								my_x, my_y;
 int								my_exp, my_level;
 short							my_motion;
@@ -90,6 +89,8 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevinstance, LPSTR IpszCmdPa
 	while (GetMessage(&Message, 0, 0, 0)) {
 		TranslateMessage(&Message);
 		DispatchMessage(&Message);
+
+		Recv_Packet();
 		SleepEx(16, true);
 	}
 
@@ -106,7 +107,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 	HPEN hPen, oldPen;
 	RECT window{ 0, 0, 840, 840 };
 
-	static CImage bg_tile_img, ch_img, npc_img;
+	static CImage ch_img, npc_img;
+	static array<CImage, 2> bg_tile_img;
 
 	// 메세지 처리하기
 	switch (uMsg) {
@@ -114,79 +116,65 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 		AdjustWindowRect(&window, WS_OVERLAPPEDWINDOW, false);         
 		MoveWindow(hWnd, 150, 70, window.right - window.left, window.bottom - window.top, false);
 
-		bg_tile_img.Load(TEXT("IMG/Tile.png"));
+		bg_tile_img[0].Load(TEXT("IMG/Tile_1.png"));
+		bg_tile_img[1].Load(TEXT("IMG/Tile_2.png"));
 		ch_img.Load(TEXT("IMG/Ham_sprite76-76.png"));
 		npc_img.Load(TEXT("IMG/HamNPC_sprite76-76.png"));
 
 		Client_Login();
 
-		SetTimer(hWnd, 1, 200, 0);
-		//SetTimer(hWnd, 2, 10, 0);
-		InvalidateRect(hWnd, NULL, FALSE);
+		SetTimer(hWnd, 2, 10, 0);
 		break;
 	}
 	case WM_SIZE:
 	case WM_MOVE: {
 
-		InvalidateRect(hWnd, NULL, FALSE);
 		break;
 	}
 	case WM_PAINT: {
-		hdc = BeginPaint(hWnd, &ps);
-		mdc = CreateCompatibleDC(hdc);
-		HBitmap = CreateCompatibleBitmap(hdc, window.right, window.bottom);
-		OldBitmap = (HBITMAP)SelectObject(mdc, (HBITMAP)HBitmap);
-		FillRect(mdc, &window, 0);
+		if (my_id != -1) {
+			hdc = BeginPaint(hWnd, &ps);
+			mdc = CreateCompatibleDC(hdc);
+			HBitmap = CreateCompatibleBitmap(hdc, window.right, window.bottom);
+			OldBitmap = (HBITMAP)SelectObject(mdc, (HBITMAP)HBitmap);
+			FillRect(mdc, &window, 0);
 
-		// 배경 타일 깔기
-		{
-			if (my_x % 2 == my_y % 2) {
-				for (int i = 0; i < (TILE_NUMBER / 2) + 1; ++i) {
-					for (int k = 0; k < (TILE_NUMBER / 2) + 1; ++k)
-						bg_tile_img.Draw(mdc, i * TILE_IMG_SIZE, k * TILE_IMG_SIZE, TILE_IMG_SIZE, TILE_IMG_SIZE, 0, 0, TILE_IMG_SIZE, TILE_IMG_SIZE);
+			// 배경 타일 깔기
+			{
+				if (my_x % 2 == my_y % 2) {
+					bg_tile_img[0].Draw(mdc, 0, 0, WIN_SIZE, WIN_SIZE, 0, 0, WIN_SIZE, WIN_SIZE);
 				}
-			}
-			else {
-				for (int i = 0; i < (TILE_NUMBER / 2) + 1; ++i) {
-					for (int k = 0; k < (TILE_NUMBER / 2) + 1; ++k) {
-						if (i == 0) {
-							bg_tile_img.Draw(mdc, i, (k * TILE_IMG_SIZE) - TILE_SIZE,
-								TILE_SIZE, TILE_IMG_SIZE,
-								0, 0,
-								TILE_SIZE, TILE_IMG_SIZE);
-							continue;
-						}
-						bg_tile_img.Draw(mdc, (i * TILE_IMG_SIZE) - TILE_SIZE, (k * TILE_IMG_SIZE), TILE_IMG_SIZE, TILE_IMG_SIZE, 0, 0, TILE_IMG_SIZE, TILE_IMG_SIZE);
-					}
+				else {
+					bg_tile_img[1].Draw(mdc, 0, 0, WIN_SIZE, WIN_SIZE, 0, 0, WIN_SIZE, WIN_SIZE);
 				}
+
+				hPen = CreatePen(PS_SOLID, 1, RGB(255, 255, 255));
+				oldPen = (HPEN)SelectObject(mdc, hPen);
+				if (my_x < TILE_NUMBER / 2 || my_y < TILE_NUMBER / 2) {
+					Rectangle(mdc, 0, 0, ((TILE_NUMBER / 2) - my_x) * TILE_SIZE, WIN_SIZE); // 세로 네모
+					Rectangle(mdc, 0, 0, WIN_SIZE, ((TILE_NUMBER / 2) - my_y) * TILE_SIZE); // 가로 네모
+				}
+				if ((W_WIDTH - my_x) <= (TILE_NUMBER / 2) || (W_HEIGHT - my_y) <= (TILE_NUMBER / 2)) {
+					Rectangle(mdc, ((WIN_SIZE / 2) + (W_WIDTH - my_x) * TILE_SIZE) - (TILE_SIZE / 2), 0, WIN_SIZE, WIN_SIZE); // 세로 네모
+					Rectangle(mdc, 0, ((WIN_SIZE / 2) + (W_HEIGHT - my_y) * TILE_SIZE) - (TILE_SIZE / 2), WIN_SIZE, WIN_SIZE); // 세로 네모
+				}
+				SelectObject(mdc, oldPen);
+				DeleteObject(hPen);
 			}
 
-			hPen = CreatePen(PS_SOLID, 1, RGB(255, 255, 255));
-			oldPen = (HPEN)SelectObject(mdc, hPen);
-			if (my_x < TILE_NUMBER / 2 || my_y < TILE_NUMBER / 2) {
-				Rectangle(mdc, 0, 0, ((TILE_NUMBER / 2) - my_x) * TILE_SIZE, WIN_SIZE); // 세로 네모
-				Rectangle(mdc, 0, 0, WIN_SIZE, ((TILE_NUMBER / 2) - my_y) * TILE_SIZE); // 가로 네모
+			// 햄스터 그리기 (플레이어)
+			for (const auto& p : players) {
+				if (p.second.id >= MAX_USER)
+					npc_img.Draw(mdc, ((10 - (my_x - p.second.x)) * (TILE_SIZE)) + 5, ((10 - (my_y - p.second.y)) * (TILE_SIZE)) + 5, TILE_SIZE - 10, TILE_SIZE - 10, my_motion * 76, 0, 76, 76);
+				else
+					ch_img.Draw(mdc, ((10 - (my_x - p.second.x)) * (TILE_SIZE)) + 5, ((10 - (my_y - p.second.y)) * (TILE_SIZE)) + 5, TILE_SIZE - 10, TILE_SIZE - 10, my_motion * 76, 0, 76, 76);
 			}
-			if ((W_WIDTH - my_x) <= (TILE_NUMBER / 2) || (W_HEIGHT - my_y) <= (TILE_NUMBER / 2)) {
-				Rectangle(mdc, ((WIN_SIZE / 2) + (W_WIDTH - my_x) * TILE_SIZE) - (TILE_SIZE / 2), 0, WIN_SIZE, WIN_SIZE); // 세로 네모
-				Rectangle(mdc, 0, ((WIN_SIZE / 2) + (W_HEIGHT - my_y) * TILE_SIZE) - (TILE_SIZE / 2), WIN_SIZE, WIN_SIZE); // 세로 네모
-			}
-			SelectObject(mdc, oldPen);
-			DeleteObject(hPen);
+
+			BitBlt(hdc, 0, 0, window.right, window.bottom, mdc, 0, 0, SRCCOPY);
+
+			DeleteDC(mdc);
+			EndPaint(hWnd, &ps);
 		}
-
-		// 햄스터 그리기 (플레이어)
-		for (const auto& p : players) {
-			if (p.second.id >= MAX_USER)
-				npc_img.Draw(mdc, ((10 - (my_x - p.second.x)) * (TILE_SIZE)) + 5, ((10 - (my_y - p.second.y)) * (TILE_SIZE)) + 5, TILE_SIZE - 10, TILE_SIZE - 10, my_motion * 76, 0, 76, 76);
-			else
-				ch_img.Draw(mdc, ((10 - (my_x - p.second.x)) * (TILE_SIZE)) + 5, ((10 - (my_y - p.second.y)) * (TILE_SIZE)) + 5, TILE_SIZE - 10, TILE_SIZE - 10, my_motion * 76, 0, 76, 76);
-		}
-
-		BitBlt(hdc, 0, 0, window.right, window.bottom, mdc, 0, 0, SRCCOPY);
-
-		DeleteDC(mdc);
-		EndPaint(hWnd, &ps);
 		break;
 	}
 	case WM_TIMER: {
@@ -200,14 +188,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 			break;
 		}
 		case 2: {
-			Recv_Packet();
+			InvalidateRect(hWnd, NULL, FALSE);
 			break;
 		}
 		default:
 			break;
 		}
-
-		InvalidateRect(hWnd, NULL, FALSE);
 		break;
 	}
 	case WM_KEYDOWN: {
@@ -245,7 +231,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 
 			Send_Packet(&p);
 		}
-		InvalidateRect(hWnd, NULL, FALSE);
 		break;
 	}
 	case WM_DESTROY: {
@@ -345,15 +330,20 @@ void Using_Packet(char* packet_ptr)
 		break;
 	}
 	case SC_ADD_OBJECT: {
-		SC_LOGIN_INFO_PACKET* packet = reinterpret_cast<SC_LOGIN_INFO_PACKET*>(packet_ptr);
+		SC_ADD_OBJECT_PACKET* packet = reinterpret_cast<SC_ADD_OBJECT_PACKET*>(packet_ptr);
 
-		my_x = packet->x;
-		my_y = packet->y;
-		players[my_id].x = packet->x;
-		players[my_id].y = packet->y;
+		players[packet->id].id = packet->id;
+		players[packet->id].x = packet->x;
+		players[packet->id].y = packet->y;
+		strcpy_s(players[packet->id].name, packet->name);
+
+		cout << players[packet->id].x << players[packet->id].y << endl;
 		break;
 	}
 	case SC_REMOVE_OBJECT: {
+		SC_REMOVE_OBJECT_PACKET* packet = reinterpret_cast<SC_REMOVE_OBJECT_PACKET*>(packet_ptr);
+
+		players.erase(packet->id);
 		break;
 	}
 	case SC_MOVE_OBJECT: {
@@ -370,9 +360,11 @@ void Using_Packet(char* packet_ptr)
 		break;		   
 	}
 	case SC_CHAT: {
+		SC_CHAT_PACKET* packet = reinterpret_cast<SC_CHAT_PACKET*>(packet_ptr);
 		break;
 	}
 	case SC_STAT_CHANGE: {
+		SC_STAT_CHANGE_PACKET* packet = reinterpret_cast<SC_STAT_CHANGE_PACKET*>(packet_ptr);
 		break;
 	}
 	default:
@@ -395,8 +387,6 @@ void CALLBACK send_callback(DWORD err, DWORD sent_size, LPWSAOVERLAPPED pwsaover
 {
 	OVER_PLUS* over = reinterpret_cast<OVER_PLUS*>(pwsaover);
 	delete over;
-
-	Recv_Packet();
 }
 
 static void print_error(const char* msg, int err_no)

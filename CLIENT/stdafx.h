@@ -13,6 +13,7 @@
 #include <unordered_map>
 #include <WS2tcpip.h>
 #include <MSWSock.h>
+#include "protocol.h"
 #pragma comment (lib, "WS2_32.LIB") // 32 쓰는 이유는 16비트 쓰던 구시절의 잔재
 
 using namespace std;

@@ -3,6 +3,7 @@
 #include "TIMER_EVENT.h"
 #include "SESSION.h"
 	//#include "OVER_PLUS.h"
+#include "SectorManager.h"
 
 class GameManager
 {
@@ -12,6 +13,7 @@ public:
 	OVER_PLUS accept_over;
 	concurrency::concurrent_priority_queue<TIMER_EVENT> timer_queue;
 	array<SESSION, MAX_USER + MAX_NPC> clients;
+	SectorManager st_mng;
 
 	GameManager();
 	~GameManager();
@@ -24,4 +26,5 @@ public:
 	void Disconnect(int cl_id);
 	void Process_packet(int c_id, char* packet);
 	int Get_new_Client_id();
+	bool Can_see(int from, int to);
 };

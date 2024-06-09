@@ -3,8 +3,6 @@
 
 using namespace std;
 
-constexpr int VIEW_RANGE = 15;
-
 GameManager GM;
 
 int main()

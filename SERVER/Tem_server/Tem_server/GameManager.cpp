@@ -15,7 +15,6 @@ GameManager::GameManager()
 
 	Make_threads();
 }
-
 GameManager::~GameManager()
 {
 	closesocket(server_socket);
@@ -32,7 +31,6 @@ void GameManager::S_Bind_Listen()
 	bind(server_socket, reinterpret_cast<sockaddr*>(&server_addr), sizeof(server_addr));
 	listen(server_socket, SOMAXCONN);
 }
-
 void GameManager::S_Accept()
 {
 	SOCKADDR_IN cl_addr;
@@ -43,7 +41,6 @@ void GameManager::S_Accept()
 	accept_over._comp_type = OP_ACCEPT;
 	AcceptEx(server_socket, client_socket, accept_over._send_buf, 0, addr_size + 16, addr_size + 16, 0, &accept_over._over);
 }
-
 void GameManager::Init_NPC()
 {
 }
@@ -164,9 +161,37 @@ void GameManager::Do_timer()
 	}
 }
 
-void GameManager::Disconnect(int cl_id)
-{
 
+bool Is_player(int object_id)
+{
+	return object_id < MAX_USER;
+}
+bool Is_npc(int object_id)
+{
+	return !Is_player(object_id);
+}
+
+void GameManager::Disconnect(int c_id)
+{
+	clients[c_id]._vl.lock();
+	unordered_set <int> vl = clients[c_id]._view_list;
+	clients[c_id]._vl.unlock();
+	for (auto& p_id : vl) {
+		if (Is_npc(p_id)) continue;
+		auto& pl = clients[p_id];
+		{
+			lock_guard<mutex> ll(pl._s_lock);
+			if (ST_INGAME != pl._state) continue;
+		}
+		if (pl._id == c_id) continue;
+		pl.send_remove_player_packet(c_id);
+	}
+	closesocket(clients[c_id]._socket);
+
+	st_mng.SLErase(c_id, clients[c_id].x / S_WIDTH, clients[c_id].y / S_HEIGHT);
+
+	lock_guard<mutex> ll(clients[c_id]._s_lock);
+	clients[c_id]._state = ST_FREE;
 }
 
 int GameManager::Get_new_Client_id()
@@ -192,8 +217,30 @@ void GameManager::Process_packet(int c_id, char* packet)
 			clients[c_id]._state = ST_INGAME;
 		}
 
+		int s_x = clients[c_id].x / S_WIDTH;
+		int s_y = clients[c_id].y / S_HEIGHT;
+
+		st_mng.SLInsert(c_id, s_x, s_y);
+
+		for (int y = s_y - 1; y < s_y + 2; ++y) {
+			for (int x = s_x - 1; x < s_x + 2; ++x) {
+				if (y < 0 || y >= W_HEIGHT / S_HEIGHT || x < 0 || x >= W_WIDTH / S_WIDTH) continue;
+				st_mng._st_lock[y][x].lock();
+				for (auto& p_id : st_mng.sector_list[y][x]) {
+					{
+						lock_guard<mutex> ll(clients[p_id]._s_lock);
+						if (ST_INGAME != clients[p_id]._state) continue;
+					}
+					if (p_id == c_id) continue;
+					if (false == Can_see(c_id, p_id))
+						continue;
+					clients[c_id].send_add_player_packet(&clients[p_id]);
+				}
+				st_mng._st_lock[y][x].unlock();
+			}
+		}
+
 		clients[c_id].send_login_info_packet();
-		clients[c_id].send_add_player_packet(&clients[c_id]);
 
 		break;
 	}
@@ -208,13 +255,67 @@ void GameManager::Process_packet(int c_id, char* packet)
 		case 2: if (x > 0) x--; break;
 		case 3: if (x < W_WIDTH - 1) x++; break;
 		}
+		int s_y = y / S_HEIGHT;
+		int s_x = x / S_WIDTH;
+		if (s_x != clients[c_id].x / S_WIDTH || s_y != clients[c_id].y / S_HEIGHT) {
+			st_mng.SLErase(c_id, clients[c_id].x / S_WIDTH, clients[c_id].y / S_HEIGHT);
+			st_mng.SLInsert(c_id, s_x, s_y);
+		}
 
+		unordered_set<int> near_list;
+		clients[c_id]._vl.lock();
+		unordered_set<int> old_vlist = clients[c_id]._view_list;
+		clients[c_id]._vl.unlock();
+
+		for (int y = s_y - 1; y < s_y + 2; ++y) {
+			for (int x = s_x - 1; x < s_x + 2; ++x) {
+				if (y < 0 || y >= W_HEIGHT / S_HEIGHT || x < 0 || x >= W_WIDTH / S_WIDTH) continue;
+				st_mng._st_lock[y][x].lock();
+				for (auto& p_id : st_mng.sector_list[y][x]) {
+					if (clients[p_id]._state != ST_INGAME) continue;
+					if (p_id == c_id) continue;
+					if (Can_see(c_id, p_id))
+						near_list.insert(p_id);
+				}
+				st_mng._st_lock[y][x].unlock();
+			}
+		}
 		clients[c_id].x = x;
 		clients[c_id].y = y;
 
 		clients[c_id].send_move_packet(&clients[c_id]);
 
+		for (auto& pl : near_list) {
+			clients[pl]._vl.lock();
+			if (clients[pl]._view_list.count(c_id)) {
+				clients[pl]._vl.unlock();
+				clients[pl].send_move_packet(&clients[c_id]);
+			}
+			else {
+				clients[pl]._vl.unlock();
+				clients[pl].send_add_player_packet(&clients[c_id]);
+			}
+
+			if (old_vlist.count(pl) == 0)
+				clients[c_id].send_add_player_packet(&clients[pl]);
+		}
+
+		for (auto& pl : old_vlist) {
+			if (0 == near_list.count(pl)) {
+				clients[c_id].send_remove_player_packet(pl);
+				if (Is_player(pl))
+					clients[pl].send_remove_player_packet(c_id);
+			}
+		}
+
+
 		break;
 	}
 	}
+}
+
+bool GameManager::Can_see(int from, int to)
+{
+	if (abs(clients[from].x - clients[to].x) > VIEW_RANGE) return false;
+	return abs(clients[from].y - clients[to].y) <= VIEW_RANGE;
 }
