@@ -32,6 +32,7 @@ constexpr char SC_CHAT				= 7;
 constexpr char SC_STAT_CHANGE		= 8;
 constexpr char SC_HIT				= 9;
 constexpr char SC_ATTACK_OBJECT		= 10;
+constexpr char SC_DEATH				= 11;
 
 #pragma pack (push, 1)
 struct CS_LOGIN_PACKET {
@@ -89,6 +90,7 @@ struct SC_ADD_OBJECT_PACKET {
 	unsigned short	size;
 	char			type;
 	int				id;
+	int				hp;
 	int				visual;				// 어떻게 생긴 OBJECT인가를 지시
 	short			x, y;
 	char			name[NAME_SIZE];
@@ -138,6 +140,14 @@ struct SC_STAT_CHANGE_PACKET {
 
 
 struct SC_ATTACK_OBJECT_PACKET {
+	unsigned short	size;
+	char			type;
+	int				id;
+	int				x;
+	int				y;
+};
+
+struct SC_DEATH_PACKET {
 	unsigned short	size;
 	char			type;
 	int				id;

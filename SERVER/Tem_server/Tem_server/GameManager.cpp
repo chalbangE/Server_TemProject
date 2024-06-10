@@ -96,6 +96,8 @@ void GameManager::Worker_thread()
 				clients[client_id]._id = client_id;
 				clients[client_id]._name[0] = 0;
 				clients[client_id]._prev_remain = 0;
+				clients[client_id].hp = 4;
+				clients[client_id].max_hp = 4;
 				clients[client_id]._socket = client_socket;
 				CreateIoCompletionPort(reinterpret_cast<HANDLE>(client_socket),
 					h_iocp, client_id, 0);
@@ -342,7 +344,15 @@ void GameManager::Process_packet(int c_id, char* packet)
 				for (auto& cl : st_mng.sector_list[y][x]) {
 					if (cl->_state != ST_INGAME) continue;
 					if (Can_see(c_id, cl->_id))
-						clients[cl->_id].send_attack_player_packet(&attack);
+						cl->send_attack_player_packet(&attack);
+					if (cl->_id == c_id) continue;
+					if (cl->x == attack.x && cl->y == attack.y) {
+						--cl->hp;
+
+						if (cl->hp <= 0) 
+							clients[c_id].send_death_player_packet(cl);
+						else clients[c_id].send_hit_player_packet(cl);
+					}
 				}
 				st_mng._st_lock[y][x].unlock();
 			}

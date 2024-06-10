@@ -34,6 +34,7 @@ public:
 	void send_add_player_packet(SESSION* client);
 	void send_hit_player_packet(SESSION* client);
 	void send_attack_player_packet(SESSION* client);
+	void send_death_player_packet(SESSION* client);
 	void send_chat_packet(int c_id, const char* mess);
 	void send_remove_player_packet(int c_id);
 };

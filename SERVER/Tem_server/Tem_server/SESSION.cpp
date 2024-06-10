@@ -38,6 +38,8 @@ void SESSION::send_login_info_packet()
 	p.type = SC_LOGIN_INFO;
 	p.x = x;
 	p.y = y;
+	p.hp = hp;
+	p.max_hp = max_hp;
 	do_send(&p);
 }
 
@@ -62,6 +64,7 @@ void SESSION::send_add_player_packet(SESSION* client)
 	add_packet.type = SC_ADD_OBJECT;
 	add_packet.x = client->x;
 	add_packet.y = client->y;
+	add_packet.hp = client->hp;
 	_vl.lock();
 	_view_list.insert(client->_id);
 	_vl.unlock();
@@ -76,6 +79,17 @@ void SESSION::send_hit_player_packet(SESSION* client)
 	hit_packet.size = sizeof(hit_packet);
 	hit_packet.type = SC_HIT;
 	do_send(&hit_packet);
+}
+
+void SESSION::send_death_player_packet(SESSION* client)
+{
+	SC_DEATH_PACKET death_packet;
+	death_packet.id = client->_id;
+	death_packet.x = client->x;
+	death_packet.y = client->y;
+	death_packet.size = sizeof(death_packet);
+	death_packet.type = SC_DEATH;
+	do_send(&death_packet);
 }
 
 void SESSION::send_attack_player_packet(SESSION* client)

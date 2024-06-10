@@ -109,7 +109,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 	HPEN hPen, oldPen;
 	RECT window{ 0, 0, 840, 840 };
 
-	static CImage ch_img, npc_img, other_ch_img, effect_img;
+	static CImage ch_img, npc_img, other_ch_img, effect_img, hpbar_img;
 	static array<CImage, 2> bg_tile_img;
 	
 
@@ -126,6 +126,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 			other_ch_img.Load(TEXT("IMG/other-player28-28.png"));
 			npc_img.Load(TEXT("IMG/npc28-28.png"));
 			effect_img.Load(TEXT("IMG/Effect28-28.png"));
+			hpbar_img.Load(TEXT("IMG/targetHPbar30-30.png"));
 		}
 
 		Client_Login();
@@ -169,17 +170,19 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 				DeleteObject(hPen);
 			}
 
-			// 햄스터 그리기 (플레이어)
+			// 그리기 (플레이어)
 			for (const auto& p : players) {
 				if (p.second.id >= MAX_USER)
 					npc_img.Draw(mdc, ((10 - (my_x - p.second.x)) * (TILE_SIZE)) + 5, ((10 - (my_y - p.second.y)) * (TILE_SIZE)) + 5, TILE_SIZE - 10, TILE_SIZE - 10, (my_motion / 5) * 28, int(p.second.dir) * 28, 28, 28);
 				else if (p.second.id == my_id) continue;
 				else other_ch_img.Draw(mdc, ((10 - (my_x - p.second.x)) * (TILE_SIZE)) + 5, ((10 - (my_y - p.second.y)) * (TILE_SIZE)) + 5, TILE_SIZE - 10, TILE_SIZE - 10, (my_motion / 5) * 28, int(p.second.dir) * 28, 28, 28);
+
+				hpbar_img.Draw(mdc, ((10 - (my_x - p.second.x)) * (TILE_SIZE)) + 5, ((10 - (my_y - p.second.y)) * (TILE_SIZE)) + 10, TILE_SIZE - 10, TILE_SIZE - 10, (p.second.hp - 1) * 30, 0, 30, 28);
 			}
 			ch_img.Draw(mdc, (10 * TILE_SIZE) + 5, (10 * TILE_SIZE) + 5, TILE_SIZE - 10, TILE_SIZE - 10, (my_motion / 5) * 28, int(my_dir) * 28, 28, 28);
 
 			for (const auto& e : effect) {
-				effect_img.Draw(mdc, ((10 - (my_x - e.x)) * (TILE_SIZE)) + 5, ((10 - (my_y - e.y)) * (TILE_SIZE)) + 5, TILE_SIZE - 10, TILE_SIZE - 10, (e.motion / 5) * 28, int(e.type) * 28, 28, 28);
+				effect_img.Draw(mdc, ((10 - (my_x - e.x)) * (TILE_SIZE)) + 5, ((10 - (my_y - e.y)) * (TILE_SIZE)) + 5, TILE_SIZE - 10, TILE_SIZE - 10, (e.motion / 3) * 28, int(e.type) * 28, 28, 28);
 			}
 
 			BitBlt(hdc, 0, 0, window.right, window.bottom, mdc, 0, 0, SRCCOPY);
@@ -260,8 +263,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 			p.size = sizeof(p);
 			p.type = CS_ATTACK;
 			p.direction = my_dir;
-
-			// effect.emplace_back(EFFECT_TYPE::ET_P_ATTACK, my_x, my_y);
 
 			Send_Packet(&p);
 		}
@@ -370,9 +371,8 @@ void Using_Packet(char* packet_ptr)
 		players[packet->id].id = packet->id;
 		players[packet->id].x = packet->x;
 		players[packet->id].y = packet->y;
+		players[packet->id].hp = packet->hp;
 		strcpy_s(players[packet->id].name, packet->name);
-
-		cout << players[packet->id].x << players[packet->id].y << endl;
 		break;
 	}
 	case SC_REMOVE_OBJECT: {
@@ -414,6 +414,18 @@ void Using_Packet(char* packet_ptr)
 
 		players[packet->id].hp = packet->hp;
 		cout << "[ " << packet->id << "] 가 맞았습니다!" << endl;
+		break;
+	}
+	case SC_DEATH: {
+		SC_DEATH_PACKET* packet = reinterpret_cast<SC_DEATH_PACKET*>(packet_ptr);
+
+		players.erase(packet->id);
+		if (packet->id == my_id)
+			effect.emplace_back(EFFECT_TYPE::ET_P_DEATH, packet->x, packet->y);
+		else if (packet->id < MAX_USER)
+			effect.emplace_back(EFFECT_TYPE::ET_OP_DEATH, packet->x, packet->y);
+		else
+			effect.emplace_back(EFFECT_TYPE::ET_NPC_DEATH, packet->x, packet->y);
 		break;
 	}
 	case SC_ATTACK_OBJECT: {

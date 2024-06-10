@@ -20,6 +20,6 @@ Effect::Effect(char a, int xx, int yy) : type(a), x(xx), y(yy) {
 void Effect::EF_Motion_Plus()
 {
 	++motion;
-	if (m_max * 5 <= motion)
+	if (m_max * 3 <= motion)
 		motion = -1;
 }
