@@ -9,6 +9,7 @@ SESSION::SESSION()
 	_name[0] = 0;
 	_state = ST_FREE;
 	_prev_remain = 0;
+	hp, max_hp = 0;
 }
 
 SESSION::~SESSION() {}
@@ -65,6 +66,27 @@ void SESSION::send_add_player_packet(SESSION* client)
 	_view_list.insert(client->_id);
 	_vl.unlock();
 	do_send(&add_packet);
+}
+
+void SESSION::send_hit_player_packet(SESSION* client)
+{
+	SC_HIT_PACKET hit_packet;
+	hit_packet.id = client->_id;
+	hit_packet.hp = client->hp;
+	hit_packet.size = sizeof(hit_packet);
+	hit_packet.type = SC_HIT;
+	do_send(&hit_packet);
+}
+
+void SESSION::send_attack_player_packet(SESSION* client)
+{
+	SC_ATTACK_OBJECT_PACKET attack_packet;
+	attack_packet.id = client->_id;
+	attack_packet.x = client->x;
+	attack_packet.y = client->y;
+	attack_packet.size = sizeof(attack_packet);
+	attack_packet.type = SC_ATTACK_OBJECT;
+	do_send(&attack_packet);
 }
 
 void SESSION::send_chat_packet(int c_id, const char* mess) {}

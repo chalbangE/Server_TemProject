@@ -224,7 +224,7 @@ void GameManager::Process_packet(int c_id, char* packet)
 
 		for (int y = s_y - 1; y < s_y + 2; ++y) {
 			for (int x = s_x - 1; x < s_x + 2; ++x) {
-				if (y < 0 || y >= W_HEIGHT / S_HEIGHT || x < 0 || x >= W_WIDTH / S_WIDTH) continue;
+				if (y < 0 || y >= (W_HEIGHT / S_HEIGHT) + 1 || x < 0 || x >= (W_WIDTH / S_WIDTH) + 1) continue;
 				st_mng._st_lock[y][x].lock();
 				for (auto& cl : st_mng.sector_list[y][x]) {
 					{
@@ -251,9 +251,9 @@ void GameManager::Process_packet(int c_id, char* packet)
 		short y = clients[c_id].y;
 		//direction |  // 0 : RIGHT, 1 : LEFT, 2 : UP, 3 : DOWN
 		switch (p->direction) {
-		case 0: if (x < W_WIDTH - 1) x++; break; 
-		case 1: if (x > 0) x--; break; 
-		case 2: if (y > 0) y--; break; 
+		case 0: if (x < W_WIDTH - 1) x++; break;
+		case 1: if (x > 0) x--; break;
+		case 2: if (y > 0) y--; break;
 		case 3: if (y < W_HEIGHT - 1) y++; break;
 		}
 		int s_y = y / S_HEIGHT;
@@ -274,7 +274,7 @@ void GameManager::Process_packet(int c_id, char* packet)
 
 		for (int y = s_y - 1; y < s_y + 2; ++y) {
 			for (int x = s_x - 1; x < s_x + 2; ++x) {
-				if (y < 0 || y >= W_HEIGHT / S_HEIGHT || x < 0 || x >= W_WIDTH / S_WIDTH) continue;
+				if (y < 0 || y >= (W_HEIGHT / S_HEIGHT) + 1 || x < 0 || x >= (W_WIDTH / S_WIDTH) + 1) continue;
 				st_mng._st_lock[y][x].lock();
 				for (auto& cl : st_mng.sector_list[y][x]) {
 					if (cl->_state != ST_INGAME) continue;
@@ -317,8 +317,36 @@ void GameManager::Process_packet(int c_id, char* packet)
 		break;
 	}
 	case CS_ATTACK: {
+		CS_ATTACK_PACKET* p = reinterpret_cast<CS_ATTACK_PACKET*>(packet);
 
-		break;
+		SESSION attack;
+		attack.x = clients[c_id].x;
+		attack.y = clients[c_id].y;
+		attack._id = c_id;
+
+		//direction |  // 0 : RIGHT, 1 : LEFT, 2 : UP, 3 : DOWN
+		switch (p->direction) {
+		case 0: if (attack.x < W_WIDTH - 1) attack.x++; break;
+		case 1: if (attack.x > 0) attack.x--; break;
+		case 2: if (attack.y > 0) attack.y--; break;
+		case 3: if (attack.y < W_HEIGHT - 1) attack.y++; break;
+		}
+
+		int s_x = clients[c_id].x / S_HEIGHT;
+		int s_y = clients[c_id].y / S_WIDTH;
+
+		for (int y = s_y - 1; y < s_y + 2; ++y) {
+			for (int x = s_x - 1; x < s_x + 2; ++x) {
+				if (y < 0 || y >= (W_HEIGHT / S_HEIGHT) + 1 || x < 0 || x >= (W_WIDTH / S_WIDTH) + 1) continue;
+				st_mng._st_lock[y][x].lock();
+				for (auto& cl : st_mng.sector_list[y][x]) {
+					if (cl->_state != ST_INGAME) continue;
+					if (Can_see(c_id, cl->_id))
+						clients[cl->_id].send_attack_player_packet(&attack);
+				}
+				st_mng._st_lock[y][x].unlock();
+			}
+		}
 	}
 	}
 }

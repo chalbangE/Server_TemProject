@@ -5,6 +5,7 @@
 #include <atlImage.h>
 #include <string>
 #include <vector>
+#include <queue>
 #include <algorithm>
 #include <conio.h>
 #include <array>

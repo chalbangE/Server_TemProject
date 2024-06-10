@@ -13,6 +13,7 @@ public:
 	int									_id;
 	SOCKET								_socket;
 	short								x, y;
+	int									hp, max_hp;
 	char								_name[NAME_SIZE];
 	int									_prev_remain;
 	unordered_set <int>					_view_list;
@@ -31,6 +32,8 @@ public:
 	void send_login_info_packet();
 	void send_move_packet(SESSION* client);
 	void send_add_player_packet(SESSION* client);
+	void send_hit_player_packet(SESSION* client);
+	void send_attack_player_packet(SESSION* client);
 	void send_chat_packet(int c_id, const char* mess);
 	void send_remove_player_packet(int c_id);
 };

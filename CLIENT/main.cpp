@@ -4,6 +4,7 @@
 #pragma once
 
 #include "../SERVER/Tem_server/Tem_server/OVER_PLUS.h"
+#include "Effect.h"
 #include "Player.h"
 	// #include "stdafx.h"
 using namespace std;
@@ -32,7 +33,7 @@ char							my_dir;
 unordered_map <int, Player>		players;
 SOCKET							send_socket, server_soket;
 WSAOVERLAPPED					wsaover;
-
+vector<Effect>					effect;
 
 void Client_Login();
 void Send_Packet(void* packet);
@@ -108,8 +109,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 	HPEN hPen, oldPen;
 	RECT window{ 0, 0, 840, 840 };
 
-	static CImage ch_img, npc_img;
+	static CImage ch_img, npc_img, other_ch_img, effect_img;
 	static array<CImage, 2> bg_tile_img;
+	
 
 	// 메세지 처리하기
 	switch (uMsg) {
@@ -117,10 +119,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 		AdjustWindowRect(&window, WS_OVERLAPPEDWINDOW, false);         
 		MoveWindow(hWnd, 150, 70, window.right - window.left, window.bottom - window.top, false);
 
-		bg_tile_img[0].Load(TEXT("IMG/Tile_1.png"));
-		bg_tile_img[1].Load(TEXT("IMG/Tile_2.png"));
-		ch_img.Load(TEXT("IMG/player28-28.png"));
-		npc_img.Load(TEXT("IMG/npc28-28.png"));
+		if (ch_img.IsNull()) {
+			bg_tile_img[0].Load(TEXT("IMG/Tile_1.png"));
+			bg_tile_img[1].Load(TEXT("IMG/Tile_2.png"));
+			ch_img.Load(TEXT("IMG/player28-28.png"));
+			other_ch_img.Load(TEXT("IMG/other-player28-28.png"));
+			npc_img.Load(TEXT("IMG/npc28-28.png"));
+			effect_img.Load(TEXT("IMG/Effect28-28.png"));
+		}
 
 		Client_Login();
 
@@ -166,9 +172,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 			// 햄스터 그리기 (플레이어)
 			for (const auto& p : players) {
 				if (p.second.id >= MAX_USER)
-					npc_img.Draw(mdc, ((10 - (my_x - p.second.x)) * (TILE_SIZE)) + 5, ((10 - (my_y - p.second.y)) * (TILE_SIZE)) + 5, TILE_SIZE - 10, TILE_SIZE - 10, my_motion * 28, int(my_dir) * 28, 28, 28);
-				else
-					ch_img.Draw(mdc, ((10 - (my_x - p.second.x)) * (TILE_SIZE)) + 5, ((10 - (my_y - p.second.y)) * (TILE_SIZE)) + 5, TILE_SIZE - 10, TILE_SIZE - 10, my_motion * 28, int(my_dir) * 28, 28, 28);
+					npc_img.Draw(mdc, ((10 - (my_x - p.second.x)) * (TILE_SIZE)) + 5, ((10 - (my_y - p.second.y)) * (TILE_SIZE)) + 5, TILE_SIZE - 10, TILE_SIZE - 10, (my_motion / 5) * 28, int(p.second.dir) * 28, 28, 28);
+				else if (p.second.id == my_id) continue;
+				else other_ch_img.Draw(mdc, ((10 - (my_x - p.second.x)) * (TILE_SIZE)) + 5, ((10 - (my_y - p.second.y)) * (TILE_SIZE)) + 5, TILE_SIZE - 10, TILE_SIZE - 10, (my_motion / 5) * 28, int(p.second.dir) * 28, 28, 28);
+			}
+			ch_img.Draw(mdc, (10 * TILE_SIZE) + 5, (10 * TILE_SIZE) + 5, TILE_SIZE - 10, TILE_SIZE - 10, (my_motion / 5) * 28, int(my_dir) * 28, 28, 28);
+
+			for (const auto& e : effect) {
+				effect_img.Draw(mdc, ((10 - (my_x - e.x)) * (TILE_SIZE)) + 5, ((10 - (my_y - e.y)) * (TILE_SIZE)) + 5, TILE_SIZE - 10, TILE_SIZE - 10, (e.motion / 5) * 28, int(e.type) * 28, 28, 28);
 			}
 
 			BitBlt(hdc, 0, 0, window.right, window.bottom, mdc, 0, 0, SRCCOPY);
@@ -182,13 +193,20 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 
 		switch (wParam)
 		{
-		case 1: {
-			++my_motion;
-			if (my_motion > 3)
-				my_motion = 0;
-			break;
-		}
 		case 2: {
+			++my_motion;
+			if (my_motion > 15)
+				my_motion = 0;
+
+			for (int i = 0; i < effect.size(); ++i) {
+				effect[i].EF_Motion_Plus();
+
+				if (effect[i].motion == -1) {
+					effect.erase(effect.begin() + i);
+					--i;
+				}
+			}
+
 			InvalidateRect(hWnd, NULL, FALSE);
 			break;
 		}
@@ -233,6 +251,21 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 
 			Send_Packet(&p);
 		}
+		break;
+	}
+	case WM_LBUTTONUP: {
+
+		if (1) { // 게임 중이라는 표시 해주기
+			CS_ATTACK_PACKET p;
+			p.size = sizeof(p);
+			p.type = CS_ATTACK;
+			p.direction = my_dir;
+
+			// effect.emplace_back(EFFECT_TYPE::ET_P_ATTACK, my_x, my_y);
+
+			Send_Packet(&p);
+		}
+
 		break;
 	}
 	case WM_DESTROY: {
@@ -351,6 +384,13 @@ void Using_Packet(char* packet_ptr)
 	case SC_MOVE_OBJECT: {
 		SC_MOVE_OBJECT_PACKET* packet = reinterpret_cast<SC_MOVE_OBJECT_PACKET*>(packet_ptr);
 
+		//direction |  // 0 : RIGHT, 1 : LEFT, 2 : UP, 3 : DOWN
+		if (players[packet->id].x < packet->x) players[packet->id].dir = 0;
+		else if (players[packet->id].x < packet->x) players[packet->id].dir = 0;
+		else if (players[packet->id].x > packet->x) players[packet->id].dir = 1;
+		else if (players[packet->id].y > packet->y) players[packet->id].dir = 2;
+		else if (players[packet->id].y < packet->y) players[packet->id].dir = 3;
+
 		players[packet->id].x = packet->x;
 		players[packet->id].y = packet->y;
 
@@ -367,6 +407,24 @@ void Using_Packet(char* packet_ptr)
 	}
 	case SC_STAT_CHANGE: {
 		SC_STAT_CHANGE_PACKET* packet = reinterpret_cast<SC_STAT_CHANGE_PACKET*>(packet_ptr);
+		break;
+	}
+	case SC_HIT: {
+		SC_HIT_PACKET* packet = reinterpret_cast<SC_HIT_PACKET*>(packet_ptr);
+
+		players[packet->id].hp = packet->hp;
+		cout << "[ " << packet->id << "] 가 맞았습니다!" << endl;
+		break;
+	}
+	case SC_ATTACK_OBJECT: {
+		SC_ATTACK_OBJECT_PACKET* packet = reinterpret_cast<SC_ATTACK_OBJECT_PACKET*>(packet_ptr);
+
+		if (packet->id == my_id)
+			effect.emplace_back(EFFECT_TYPE::ET_P_ATTACK, packet->x, packet->y);
+		else if (packet->id < MAX_USER)
+			effect.emplace_back(EFFECT_TYPE::ET_OP_ATTACK, packet->x, packet->y);
+		else
+			effect.emplace_back(EFFECT_TYPE::ET_NPC_ATTACK, packet->x, packet->y);
 		break;
 	}
 	default:

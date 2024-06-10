@@ -30,6 +30,8 @@ constexpr char SC_REMOVE_OBJECT		= 5;
 constexpr char SC_MOVE_OBJECT		= 6;
 constexpr char SC_CHAT				= 7;
 constexpr char SC_STAT_CHANGE		= 8;
+constexpr char SC_HIT				= 9;
+constexpr char SC_ATTACK_OBJECT		= 10;
 
 #pragma pack (push, 1)
 struct CS_LOGIN_PACKET {
@@ -60,6 +62,16 @@ struct CS_LOGOUT_PACKET {
 	unsigned short	size;
 	char			type;
 };
+
+struct CS_ATTACK_PACKET {
+	unsigned short	size;
+	char			type;
+	char			direction;  // 0 : UP, 1 : DOWN, 2 : LEFT, 3 : RIGHT
+};
+
+
+// ----------------------------------------------------------------------------------
+
 
 struct SC_LOGIN_INFO_PACKET {
 	unsigned short	size;
@@ -108,6 +120,13 @@ struct SC_LOGIN_FAIL_PACKET {
 	char			type;
 };
 
+struct SC_HIT_PACKET {
+	unsigned short	size;
+	char			type;
+	int				id;
+	int				hp;
+};
+
 struct SC_STAT_CHANGE_PACKET {
 	unsigned short	size;
 	char			type;
@@ -115,7 +134,15 @@ struct SC_STAT_CHANGE_PACKET {
 	int				max_hp;
 	int				exp;
 	int				level;
+};
 
+
+struct SC_ATTACK_OBJECT_PACKET {
+	unsigned short	size;
+	char			type;
+	int				id;
+	int				x;
+	int				y;
 };
 
 #pragma pack (pop)
