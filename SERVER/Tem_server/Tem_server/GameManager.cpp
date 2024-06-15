@@ -47,13 +47,21 @@ void GameManager::Make_threads()
 	vector <thread> worker_threads;
 	int num_threads = std::thread::hardware_concurrency();
 	for (int i = 0; i < num_threads; ++i)
-		worker_threads.emplace_back([this](){
-			Worker_thread(); 
-			});
-	//thread timer_thread{ Do_timer };
-	//timer_thread.join();
+		worker_threads.emplace_back( &GameManager::Worker_thread, this );
+	thread timer_thread{ &GameManager::Do_timer, this };
+	timer_thread.join();
 	for (auto& th : worker_threads)
-		th.join();
+		th.join();	
+}
+
+
+bool Is_player(int object_id)
+{
+	return object_id < MAX_USER;
+}
+bool Is_npc(int object_id)
+{
+	return !Is_player(object_id);
 }
 
 void GameManager::Worker_thread()
@@ -96,8 +104,7 @@ void GameManager::Worker_thread()
 				clients[client_id].hp = 4;
 				clients[client_id].max_hp = 4;
 				clients[client_id]._socket = client_socket;
-				CreateIoCompletionPort(reinterpret_cast<HANDLE>(client_socket),
-					h_iocp, client_id, 0);
+				CreateIoCompletionPort(reinterpret_cast<HANDLE>(client_socket), h_iocp, client_id, 0);
 				clients[client_id].do_recv();
 				client_socket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
 			}
@@ -128,8 +135,41 @@ void GameManager::Worker_thread()
 			clients[key].do_recv();
 			break;
 		}
-		case OP_SEND:
+		case OP_SEND: {
 			delete ex_over;
+			break;
+		}
+		case OP_NPC_MOVE: {
+			bool keep_alive = false;
+			int s_y = clients[key].y / S_HEIGHT;
+			int s_x = clients[key].x / S_WIDTH;
+			for (int y = -1; y < s_y + 2; ++y) {
+				for (int x = s_x - 1; x < s_x + 2; ++x) {
+					if (y < 0 || y >= W_HEIGHT / S_HEIGHT || x < 0 || x >= W_WIDTH / S_WIDTH) continue;
+					st_mng._st_lock[y][x].lock();
+					for (auto& j : st_mng.sector_list[y][x]) {
+						if (j->_state != ST_INGAME) continue;
+						if (!Is_player(j->_id)) continue;
+						if (Can_see(static_cast<int>(key), j->_id)) {
+							keep_alive = true;
+							ex_over->_ai_target_obj = j->_id;
+							break;
+						}
+					}
+					st_mng._st_lock[y][x].unlock();
+				}
+			}
+			if (true == keep_alive) {
+				Do_npc_random_move(static_cast<int>(key));
+				TIMER_EVENT ev{ key, chrono::system_clock::now() + 1s, EV_RANDOM_MOVE, 0 };
+				timer_queue.push(ev);
+			}
+			else {
+				clients[key]._is_active = false;
+			}
+			delete ex_over;
+			break;
+		}
 			break;
 		}
 	}
@@ -140,6 +180,7 @@ void GameManager::Do_timer()
 	while (true) {
 		TIMER_EVENT ev;
 		auto current_time = chrono::system_clock::now();
+
 		if (true == timer_queue.try_pop(ev)) {
 			if (ev.wakeup_time > current_time) {
 				timer_queue.push(ev);		// 최적화 필요
@@ -160,15 +201,16 @@ void GameManager::Do_timer()
 	}
 }
 
+void GameManager::WakeUpNPC(int npc_id, int waker)
+{
+	if (clients[npc_id]._is_active) return;
+	bool old_state = false;
+	if (false == atomic_compare_exchange_strong(&clients[npc_id]._is_active, &old_state, true))
+		return;
+	TIMER_EVENT ev{ npc_id, chrono::system_clock::now(), EV_RANDOM_MOVE, 0 };
+	timer_queue.push(ev);
+}
 
-bool Is_player(int object_id)
-{
-	return object_id < MAX_USER;
-}
-bool Is_npc(int object_id)
-{
-	return !Is_player(object_id);
-}
 void GameManager::Init_NPC()
 {
 	cout << "NPC intialize begin.\n";
@@ -198,6 +240,89 @@ void GameManager::Init_NPC()
 		//lua_register(L, "API_SendMessgeBye", API_SendMessgeBye);
 	}
 	cout << "NPC initialize end.\n";
+}
+void GameManager::Do_npc_random_move(int npc_id)
+{
+	SESSION& npc = clients[npc_id];
+	unordered_set<int> old_vl;
+	int s_y = clients[npc_id].y / S_HEIGHT;
+	int s_x = clients[npc_id].x / S_WIDTH;
+
+	for (int y = s_y - 1; y < s_y + 2; ++y) {
+		for (int x = s_x - 1; x < s_x + 2; ++x) {
+			if (y < 0 || y >= (W_HEIGHT / S_HEIGHT) + 1 || x < 0 || x >= (W_WIDTH / S_WIDTH) + 1) continue;
+			st_mng._st_lock[y][x].lock();
+			for (auto& j : st_mng.sector_list[y][x]) {
+				if (ST_INGAME != j->_state) continue;
+				if (true == Is_npc(j->_id)) continue;
+				if (true == Can_see(npc._id, j->_id))
+					old_vl.insert(j->_id);
+			}
+			st_mng._st_lock[y][x].unlock();
+		}
+	}
+
+	int x = npc.x;
+	int y = npc.y;
+	npc.dir = rand() % 4;
+	switch (npc.dir) {
+	case 0: if (x < (W_WIDTH - 1)) x++; break;
+	case 1: if (x > 0) x--; break;
+	case 2: if (y < (W_HEIGHT - 1)) y++; break;
+	case 3:if (y > 0) y--; break;
+	}
+	s_y = y / S_HEIGHT;
+	s_x = x / S_WIDTH;
+
+	if (s_x != npc.x / S_WIDTH || s_y != npc.y / S_HEIGHT) {
+		st_mng.SLErase(&npc);
+
+		npc.x = x;
+		npc.y = y;
+		st_mng.SLInsert(&clients[npc_id]);
+	}
+
+	npc.x = x;
+	npc.y = y;
+
+	unordered_set<int> new_vl;
+	for (int y = s_y - 1; y < s_y + 2; ++y) {
+		for (int x = s_x - 1; x < s_x + 2; ++x) {
+			if (y < 0 || y >= (W_HEIGHT / S_HEIGHT) + 1 || x < 0 || x >= (W_WIDTH / S_WIDTH) + 1) continue;
+			st_mng._st_lock[y][x].lock();
+			for (auto& j : st_mng.sector_list[y][x]) {
+				if (ST_INGAME != j->_state) continue;
+				if (true == Is_npc(j->_id)) continue;
+				if (true == Can_see(npc._id, j->_id))
+					new_vl.insert(j->_id);
+			}
+			st_mng._st_lock[y][x].unlock();
+		}
+	}
+
+	for (auto pl : new_vl) {
+		if (0 == old_vl.count(pl)) {
+			// 플레이어의 시야에 등장
+			clients[pl].send_add_player_packet(&npc);
+		}
+		else {
+			// 플레이어가 계속 보고 있음.
+			clients[pl].send_move_packet(&npc);
+		}
+	}
+	///vvcxxccxvvdsvdvds
+	for (auto pl : old_vl) {
+		if (0 == new_vl.count(pl)) {
+			clients[pl]._vl.lock();
+			if (0 != clients[pl]._view_list.count(npc._id)) {
+				clients[pl]._vl.unlock();
+				clients[pl].send_remove_player_packet(npc._id);
+			}
+			else {
+				clients[pl]._vl.unlock();
+			}
+		}
+	}
 }
 
 void GameManager::Disconnect(int c_id)
@@ -261,8 +386,9 @@ void GameManager::Process_packet(int c_id, char* packet)
 						if (ST_INGAME != cl->_state) continue;
 					}
 					if (cl->_id == c_id) continue;
-					if (false == Can_see(c_id, cl->_id))
-						continue;
+					if (false == Can_see(c_id, cl->_id)) continue;
+					if (Is_player(cl->_id)) cl->send_add_player_packet(&clients[c_id]);
+					else WakeUpNPC(cl->_id, c_id);
 					clients[c_id].send_add_player_packet(cl);
 				}
 				st_mng._st_lock[y][x].unlock();
@@ -325,15 +451,18 @@ void GameManager::Process_packet(int c_id, char* packet)
 		clients[c_id].send_move_packet(&clients[c_id]);
 
 		for (auto& pl : near_list) {
-			clients[pl]._vl.lock();
-			if (clients[pl]._view_list.count(c_id)) {
-				clients[pl]._vl.unlock();
-				clients[pl].send_move_packet(&clients[c_id]);
+			if (Is_player(pl)) {
+				clients[pl]._vl.lock();
+				if (clients[pl]._view_list.count(c_id)) {
+					clients[pl]._vl.unlock();
+					clients[pl].send_move_packet(&clients[c_id]);
+				}
+				else {
+					clients[pl]._vl.unlock();
+					clients[pl].send_add_player_packet(&clients[c_id]);
+				}
 			}
-			else {
-				clients[pl]._vl.unlock();
-				clients[pl].send_add_player_packet(&clients[c_id]);
-			}
+			else WakeUpNPC(pl, c_id);
 
 			if (old_vlist.count(pl) == 0)
 				clients[c_id].send_add_player_packet(&clients[pl]);
@@ -380,8 +509,12 @@ void GameManager::Process_packet(int c_id, char* packet)
 					if (cl->x == attack.x && cl->y == attack.y) {
 						--cl->hp;
 
-						if (cl->hp <= 0) 
+						if (cl->hp <= 0) {
+							cl->_s_lock.lock();
+							cl->_state = ST_FREE;
+							cl->_s_lock.unlock();
 							clients[c_id].send_death_player_packet(cl);
+						}
 						else clients[c_id].send_hit_player_packet(cl);
 					}
 				}

@@ -27,4 +27,6 @@ public:
 	int Get_new_Client_id();
 	bool Can_see(int from, int to);
 	void Init_NPC();
+	void Do_npc_random_move(int npc_id);
+	void WakeUpNPC(int npc_id, int waker);
 };

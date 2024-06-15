@@ -171,6 +171,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 				DeleteObject(hPen);
 			}
 
+
+
 			// 그리기 (플레이어)
 			for (const auto& p : players) {
 				if (p.second.id >= MAX_USER)
@@ -180,14 +182,18 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 
 				hpbar_img.Draw(mdc, ((10 - (my_x - p.second.x)) * (TILE_SIZE)) + 5, ((10 - (my_y - p.second.y)) * (TILE_SIZE)) + 10, TILE_SIZE - 10, TILE_SIZE - 10, (p.second.hp - 1) * 30, 0, 30, 28);
 			}
-			ch_img.Draw(mdc, (10 * TILE_SIZE) + 5, (10 * TILE_SIZE) + 5, TILE_SIZE - 10, TILE_SIZE - 10, (my_motion / 5) * 28, int(my_dir) * 28, 28, 28);
-
+			// 이펙트
 			for (const auto& e : effect) {
 				effect_img.Draw(mdc, ((10 - (my_x - e.x)) * (TILE_SIZE)) + 5, ((10 - (my_y - e.y)) * (TILE_SIZE)) + 5, TILE_SIZE - 10, TILE_SIZE - 10, (e.motion / 3) * 28, int(e.type) * 28, 28, 28);
 			}
 
+			ch_img.Draw(mdc, (10 * TILE_SIZE) + 5, (10 * TILE_SIZE) + 5, TILE_SIZE - 10, TILE_SIZE - 10, (my_motion / 5) * 28, int(my_dir) * 28, 28, 28);
+
+
 			BitBlt(hdc, 0, 0, window.right, window.bottom, mdc, 0, 0, SRCCOPY);
 
+			SelectObject(mdc, OldBitmap);
+			DeleteObject(HBitmap);
 			DeleteDC(mdc);
 			EndPaint(hWnd, &ps);
 		}
@@ -425,7 +431,7 @@ void Using_Packet(char* packet_ptr)
 		SC_HIT_PACKET* packet = reinterpret_cast<SC_HIT_PACKET*>(packet_ptr);
 
 		players[packet->id].hp = packet->hp;
-		cout << "[ " << packet->id << "] 가 맞았습니다!" << endl;
+		cout << "[ " << packet->id << " ] 가 맞았습니다!" << endl;
 		break;
 	}
 	case SC_DEATH: {

@@ -3,6 +3,7 @@
 
 class Player
 {
+
 public:
 	int				id;
 	int				hp;
