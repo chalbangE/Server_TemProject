@@ -41,9 +41,6 @@ void GameManager::S_Accept()
 	accept_over._comp_type = OP_ACCEPT;
 	AcceptEx(server_socket, client_socket, accept_over._send_buf, 0, addr_size + 16, addr_size + 16, 0, &accept_over._over);
 }
-void GameManager::Init_NPC()
-{
-}
 
 void GameManager::Make_threads()
 {
@@ -172,6 +169,36 @@ bool Is_npc(int object_id)
 {
 	return !Is_player(object_id);
 }
+void GameManager::Init_NPC()
+{
+	cout << "NPC intialize begin.\n";
+	for (int i = MAX_USER; i < MAX_USER + MAX_NPC; ++i) {
+		clients[i].x = rand() % W_WIDTH;
+		clients[i].y = rand() % W_HEIGHT;
+		clients[i]._id = i;
+		sprintf_s(clients[i]._name, "NPC%d", i);
+		clients[i]._state = ST_INGAME;
+
+		st_mng.SLInsert(&clients[i]);
+
+		//auto L = clients[i]._L = luaL_newstate();
+		//luaL_openlibs(L);
+		//luaL_loadfile(L, "npc.lua");
+		//lua_pcall(L, 0, 0, 0);
+
+		//lua_getglobal(L, "set_uid");
+		//lua_pushnumber(L, i);
+		//lua_pcall(L, 1, 0, 0);
+		// lua_pop(L, 1);// eliminate set_uid from stack after call
+
+		//lua_register(L, "API_SendMessage", API_SendMessage);
+		//lua_register(L, "API_get_x", API_get_x);
+		//lua_register(L, "API_get_y", API_get_y);
+		//lua_register(L, "API_check_move_start_time", API_check_move_start_time);
+		//lua_register(L, "API_SendMessgeBye", API_SendMessgeBye);
+	}
+	cout << "NPC initialize end.\n";
+}
 
 void GameManager::Disconnect(int c_id)
 {
@@ -251,13 +278,18 @@ void GameManager::Process_packet(int c_id, char* packet)
 		clients[c_id].last_move_time = p->move_time;
 		short x = clients[c_id].x;
 		short y = clients[c_id].y;
+		
 		//direction |  // 0 : RIGHT, 1 : LEFT, 2 : UP, 3 : DOWN
+		
 		switch (p->direction) {
 		case 0: if (x < W_WIDTH - 1) x++; break;
 		case 1: if (x > 0) x--; break;
 		case 2: if (y > 0) y--; break;
 		case 3: if (y < W_HEIGHT - 1) y++; break;
 		}
+
+		if (p->direction > 3)
+			p->direction -= 4;
 		int s_y = y / S_HEIGHT;
 		int s_x = x / S_WIDTH;
 
@@ -314,7 +346,6 @@ void GameManager::Process_packet(int c_id, char* packet)
 					clients[pl].send_remove_player_packet(c_id);
 			}
 		}
-
 
 		break;
 	}

@@ -13,6 +13,7 @@ public:
 	int									_id;
 	SOCKET								_socket;
 	short								x, y;
+	char								dir;
 	int									hp, max_hp;
 	char								_name[NAME_SIZE];
 	int									_prev_remain;

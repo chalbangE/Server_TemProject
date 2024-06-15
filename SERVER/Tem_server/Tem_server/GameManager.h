@@ -19,7 +19,6 @@ public:
 	~GameManager();
 	void S_Bind_Listen();
 	void S_Accept();
-	void Init_NPC();
 	void Make_threads();
 	void Worker_thread();
 	void Do_timer();
@@ -27,4 +26,5 @@ public:
 	void Process_packet(int c_id, char* packet);
 	int Get_new_Client_id();
 	bool Can_see(int from, int to);
+	void Init_NPC();
 };

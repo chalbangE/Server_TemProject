@@ -111,7 +111,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 
 	static CImage ch_img, npc_img, other_ch_img, effect_img, hpbar_img;
 	static array<CImage, 2> bg_tile_img;
-	
+
+	static bool control_on = false;
 
 	// 메세지 처리하기
 	switch (uMsg) {
@@ -223,6 +224,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 		char direction = -1;
 
 		switch (wParam) {
+		case VK_CONTROL: {
+			control_on = true;
+			break;
+		}
 		case 'd':
 		case 'D': {
 			direction = 0;
@@ -250,9 +255,20 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 			CS_MOVE_PACKET p;
 			p.size = sizeof(p);
 			p.type = CS_MOVE;
+			if (control_on)
+				direction += 4;
 			p.direction = direction;
 
 			Send_Packet(&p);
+		}
+		break;
+	}
+	case WM_KEYUP: {
+		switch (wParam) {
+		case VK_CONTROL: {
+			control_on = false;
+			break;
+		}
 		}
 		break;
 	}
@@ -383,16 +399,12 @@ void Using_Packet(char* packet_ptr)
 	}
 	case SC_MOVE_OBJECT: {
 		SC_MOVE_OBJECT_PACKET* packet = reinterpret_cast<SC_MOVE_OBJECT_PACKET*>(packet_ptr);
+		Player* targetPlayer = &players[packet->id];
 
 		//direction |  // 0 : RIGHT, 1 : LEFT, 2 : UP, 3 : DOWN
-		if (players[packet->id].x < packet->x) players[packet->id].dir = 0;
-		else if (players[packet->id].x < packet->x) players[packet->id].dir = 0;
-		else if (players[packet->id].x > packet->x) players[packet->id].dir = 1;
-		else if (players[packet->id].y > packet->y) players[packet->id].dir = 2;
-		else if (players[packet->id].y < packet->y) players[packet->id].dir = 3;
-
-		players[packet->id].x = packet->x;
-		players[packet->id].y = packet->y;
+		targetPlayer->dir = packet->dir % 4;
+		targetPlayer->x = packet->x;
+		targetPlayer->y = packet->y;
 
 		if (my_id == packet->id) {
 			my_x = packet->x;

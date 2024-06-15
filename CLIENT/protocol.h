@@ -5,7 +5,7 @@ constexpr int NAME_SIZE				= 20;
 constexpr int CHAT_SIZE				= 300;
 
 constexpr int MAX_USER				= 10000;
-constexpr int MAX_NPC				= 200000;
+constexpr int MAX_NPC				= 100;
 
 constexpr int W_WIDTH				= 50;
 constexpr int W_HEIGHT				= 50;
@@ -13,7 +13,7 @@ constexpr int W_HEIGHT				= 50;
 constexpr int S_WIDTH				= 20;
 constexpr int S_HEIGHT				= 20;
 
-constexpr int VIEW_RANGE			= 15;
+constexpr int VIEW_RANGE			= 7;
 
 // Packet ID
 constexpr char CS_LOGIN				= 0;
@@ -107,6 +107,7 @@ struct SC_MOVE_OBJECT_PACKET {
 	char			type;
 	int				id;
 	short			x, y;
+	char			dir;
 	unsigned int	move_time;
 };
 
