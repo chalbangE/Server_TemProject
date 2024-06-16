@@ -214,8 +214,14 @@ void GameManager::Init_NPC()
 {
 	cout << "NPC intialize begin.\n";
 	for (int i = MAX_USER; i < MAX_USER + MAX_NPC; ++i) {
-		clients[i].x = rand() % W_WIDTH;
-		clients[i].y = rand() % W_HEIGHT;
+		while (1) {
+			clients[i].x = rand() % W_WIDTH;
+			clients[i].y = rand() % W_HEIGHT;
+
+			if (w_map_mng.map[clients[i].y][clients[i].x] == MI_CRACK_WALL || w_map_mng.map[clients[i].y][clients[i].x] == MI_SOILD_WALL) continue;
+			
+			break;
+		}
 		clients[i]._id = i;
 		sprintf_s(clients[i]._name, "NPC%d", i);
 		clients[i]._state = ST_INGAME;
@@ -270,6 +276,8 @@ void GameManager::Do_npc_random_move(int npc_id)
 	case 2: if (y < (W_HEIGHT - 1)) y++; break;
 	case 3:if (y > 0) y--; break;
 	}
+	if (w_map_mng.map[y][x] == MI_CRACK_WALL || w_map_mng.map[y][x] == MI_SOILD_WALL) return;
+
 	s_y = y / S_HEIGHT;
 	s_x = x / S_WIDTH;
 
@@ -512,6 +520,17 @@ void GameManager::Process_packet(int c_id, char* packet)
 		int s_x = clients[c_id].x / S_HEIGHT;
 		int s_y = clients[c_id].y / S_WIDTH;
 
+		// 부술 수 있는 벽 공격하면 뿌수기
+		bool blocken_wall = false;
+		w_map_mng.m_lock[s_y][s_x].lock();
+		if (w_map_mng.map[attack.y][attack.x] == static_cast<char>(MI_CRACK_WALL)) {
+			w_map_mng.map[attack.y][attack.x] = MI_ITEM;
+			blocken_wall = true;
+			clients[c_id].send_change_map_packet(attack.x, attack.y, w_map_mng.map[attack.y][attack.x]);
+		}
+		w_map_mng.m_lock[s_y][s_x].unlock();
+
+
 		for (int y = s_y - 1; y < s_y + 2; ++y) {
 			for (int x = s_x - 1; x < s_x + 2; ++x) {
 				if (y < 0 || y >= (W_HEIGHT / S_HEIGHT) + 1 || x < 0 || x >= (W_WIDTH / S_WIDTH) + 1) continue;
@@ -520,6 +539,8 @@ void GameManager::Process_packet(int c_id, char* packet)
 					if (cl->_state != ST_INGAME) continue;
 					if (Can_see(c_id, cl->_id))
 						cl->send_attack_player_packet(&attack);
+					// 벽을 부쉈으면 다른 플레이어나 npc가 있을수가 없으니까 피 까는거 이런거 넘기기
+					if (blocken_wall) continue;
 					if (cl->_id == c_id) continue;
 					if (cl->x == attack.x && cl->y == attack.y) {
 						--cl->hp;

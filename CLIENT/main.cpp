@@ -185,10 +185,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 
 				hpbar_img.Draw(mdc, ((10 - (my_x - p.second.x)) * (TILE_SIZE)) + 5, ((10 - (my_y - p.second.y)) * (TILE_SIZE)) + 10, TILE_SIZE - 10, TILE_SIZE - 10, (p.second.hp - 1) * 30, 0, 30, 28);
 			}
-			// ¿Ã∆Â∆Æ
-			for (const auto& e : effect) {
-				effect_img.Draw(mdc, ((10 - (my_x - e.x)) * (TILE_SIZE)) + 5, ((10 - (my_y - e.y)) * (TILE_SIZE)) + 5, TILE_SIZE - 10, TILE_SIZE - 10, (e.motion / 3) * 28, int(e.type) * 28, 28, 28);
-			}
 
 			for (int y = my_y - VIEW_RANGE; y < my_y + VIEW_RANGE; ++y) {
 				for (int x = my_x - VIEW_RANGE; x < my_x + VIEW_RANGE; ++x) {
@@ -197,17 +193,20 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 					switch (w_map[y][x])
 					{
 					case MI_SOILD_WALL:
-					case MI_CRACK_WALL: {
-						wall_img.Draw(mdc, ((10 - (my_x - x)) * (TILE_SIZE)) + 5, ((10 - (my_y - y)) * (TILE_SIZE)) + 5, TILE_SIZE - 10, TILE_SIZE - 10, (int(w_map[y][x]) - 1) * 31, 0, 31, 25);
-						break;
-					}
+					case MI_CRACK_WALL:
 					case MI_ITEM: {
+						wall_img.Draw(mdc, ((10 - (my_x - x)) * (TILE_SIZE)) + 5, ((10 - (my_y - y)) * (TILE_SIZE)) + 5, TILE_SIZE - 10, TILE_SIZE - 10, (int(w_map[y][x]) - 1) * 31, 0, 31, 25);
 						break;
 					}
 					default:
 						break;
 					}
 				}
+			}
+
+			// ¿Ã∆Â∆Æ
+			for (const auto& e : effect) {
+				effect_img.Draw(mdc, ((10 - (my_x - e.x)) * (TILE_SIZE)) + 5, ((10 - (my_y - e.y)) * (TILE_SIZE)) + 5, TILE_SIZE - 10, TILE_SIZE - 10, (e.motion / 3) * 28, int(e.type) * 28, 28, 28);
 			}
 
 			ch_img.Draw(mdc, (10 * TILE_SIZE) + 5, (10 * TILE_SIZE) + 5, TILE_SIZE - 10, TILE_SIZE - 10, (my_motion / 5) * 28, int(my_dir) * 28, 28, 28);
@@ -277,7 +276,17 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 			direction = 3;
 			break;
 		}
+		}		
+		
+		short x = my_x;
+		short y = my_y;
+		switch (direction) {
+		case 0: if (x < W_WIDTH - 1) x++; break;
+		case 1: if (x > 0) x--; break;
+		case 2: if (y > 0) y--; break;
+		case 3: if (y < W_HEIGHT - 1) y++; break;
 		}
+		if (w_map[y][x] == MI_CRACK_WALL || w_map[y][x] == MI_SOILD_WALL) break;
 
 		if (-1 != direction) {
 			my_dir = direction;
