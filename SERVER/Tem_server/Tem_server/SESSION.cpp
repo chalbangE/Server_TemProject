@@ -51,6 +51,7 @@ void SESSION::send_move_packet(SESSION* client)
 	p.type = SC_MOVE_OBJECT;
 	p.x = client->x;
 	p.y = client->y;
+	p.dir = client->dir;
 	p.move_time = client->last_move_time;
 	do_send(&p);
 }
@@ -65,19 +66,20 @@ void SESSION::send_add_player_packet(SESSION* client)
 	add_packet.x = client->x;
 	add_packet.y = client->y;
 	add_packet.hp = client->hp;
+	add_packet.max_hp = client->max_hp;
 	_vl.lock();
 	_view_list.insert(client->_id);
 	_vl.unlock();
 	do_send(&add_packet);
 }
 
-void SESSION::send_hit_player_packet(SESSION* client)
+void SESSION::send_hp_update_packet(SESSION* client)
 {
-	SC_HIT_PACKET hit_packet;
+	SC_HP_UPDATE_PACKET hit_packet;
 	hit_packet.id = client->_id;
 	hit_packet.hp = client->hp;
 	hit_packet.size = sizeof(hit_packet);
-	hit_packet.type = SC_HIT;
+	hit_packet.type = SC_HP_UPDATE;
 	do_send(&hit_packet);
 }
 

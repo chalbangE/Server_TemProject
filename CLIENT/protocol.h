@@ -30,7 +30,7 @@ constexpr char SC_REMOVE_OBJECT		= 5;
 constexpr char SC_MOVE_OBJECT		= 6;
 constexpr char SC_CHAT				= 7;
 constexpr char SC_STAT_CHANGE		= 8;
-constexpr char SC_HIT				= 9;
+constexpr char SC_HP_UPDATE			= 9;
 constexpr char SC_ATTACK_OBJECT		= 10;
 constexpr char SC_DEATH				= 11;
 constexpr char SC_CHANGE_MAP		= 12;
@@ -91,7 +91,7 @@ struct SC_ADD_OBJECT_PACKET {
 	unsigned short	size;
 	char			type;
 	int				id;
-	int				hp;
+	char			hp, max_hp;
 	int				visual;				// 어떻게 생긴 OBJECT인가를 지시
 	short			x, y;
 	char			name[NAME_SIZE];
@@ -124,11 +124,12 @@ struct SC_LOGIN_FAIL_PACKET {
 	char			type;
 };
 
-struct SC_HIT_PACKET {
+struct SC_HP_UPDATE_PACKET {
 	unsigned short	size;
 	char			type;
 	int				id;
 	int				hp;
+	char			hp_uadate_why;
 };
 
 struct SC_STAT_CHANGE_PACKET {

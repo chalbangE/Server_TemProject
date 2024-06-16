@@ -223,26 +223,12 @@ void GameManager::Init_NPC()
 			break;
 		}
 		clients[i]._id = i;
+		clients[i].max_hp = 2;
+		clients[i].hp = 2;
 		sprintf_s(clients[i]._name, "NPC%d", i);
 		clients[i]._state = ST_INGAME;
 
 		st_mng.SLInsert(&clients[i]);
-
-		//auto L = clients[i]._L = luaL_newstate();
-		//luaL_openlibs(L);
-		//luaL_loadfile(L, "npc.lua");
-		//lua_pcall(L, 0, 0, 0);
-
-		//lua_getglobal(L, "set_uid");
-		//lua_pushnumber(L, i);
-		//lua_pcall(L, 1, 0, 0);
-		// lua_pop(L, 1);// eliminate set_uid from stack after call
-
-		//lua_register(L, "API_SendMessage", API_SendMessage);
-		//lua_register(L, "API_get_x", API_get_x);
-		//lua_register(L, "API_get_y", API_get_y);
-		//lua_register(L, "API_check_move_start_time", API_check_move_start_time);
-		//lua_register(L, "API_SendMessgeBye", API_SendMessgeBye);
 	}
 	cout << "NPC initialize end.\n";
 }
@@ -273,8 +259,8 @@ void GameManager::Do_npc_random_move(int npc_id)
 	switch (npc.dir) {
 	case 0: if (x < (W_WIDTH - 1)) x++; break;
 	case 1: if (x > 0) x--; break;
-	case 2: if (y < (W_HEIGHT - 1)) y++; break;
-	case 3:if (y > 0) y--; break;
+	case 2: if (y > 0) y--; break;
+	case 3: if (y < (W_HEIGHT - 1)) y++; break;
 	}
 	if (w_map_mng.map[y][x] == MI_CRACK_WALL || w_map_mng.map[y][x] == MI_SOILD_WALL) return;
 
@@ -436,6 +422,10 @@ void GameManager::Process_packet(int c_id, char* packet)
 		case 2: if (y > 0) y--; break;
 		case 3: if (y < W_HEIGHT - 1) y++; break;
 		}
+		if (w_map_mng.map[y][x] == MI_CRACK_WALL || w_map_mng.map[y][x] == MI_SOILD_WALL) {
+			x = clients[c_id].x;
+			y = clients[c_id].y;
+		}
 
 		if (p->direction > 3)
 			p->direction -= 4;
@@ -472,6 +462,11 @@ void GameManager::Process_packet(int c_id, char* packet)
 		clients[c_id].x = x;
 		clients[c_id].y = y;
 		clients[c_id].send_move_packet(&clients[c_id]);
+		if (w_map_mng.map[y][x] == MI_ITEM) {
+			clients[c_id].send_hp_update_packet(&clients[c_id]);
+			clients[c_id].send_change_map_packet(x, y, MI_FREE);
+		}
+
 
 		for (auto& pl : near_list) {
 			if (Is_player(pl)) {
@@ -479,16 +474,30 @@ void GameManager::Process_packet(int c_id, char* packet)
 				if (clients[pl]._view_list.count(c_id)) {
 					clients[pl]._vl.unlock();
 					clients[pl].send_move_packet(&clients[c_id]);
+					
+					if (w_map_mng.map[y][x] == MI_ITEM) {
+						clients[pl].send_hp_update_packet(&clients[c_id]);
+						clients[pl].send_change_map_packet(x, y, MI_FREE);
+					}
 				}
 				else {
 					clients[pl]._vl.unlock();
 					clients[pl].send_add_player_packet(&clients[c_id]);
+					if (w_map_mng.map[y][x] == MI_ITEM) {
+						// 여기서는 hp 정보가 add에 들어있어서 hp_update 안해줘도 됨
+						clients[pl].send_change_map_packet(x, y, MI_FREE);
+					}
 				}
 			}
 			else WakeUpNPC(pl, c_id);
 
-			if (old_vlist.count(pl) == 0)
+			if (old_vlist.count(pl) == 0) {
 				clients[c_id].send_add_player_packet(&clients[pl]);
+				if (w_map_mng.map[y][x] == MI_ITEM) {
+					// 여기서는 hp 정보가 add에 들어있어서 hp_update 안해줘도 됨
+					clients[pl].send_change_map_packet(x, y, MI_FREE);
+				}
+			}
 		}
 
 		for (auto& pl : old_vlist) {
@@ -499,6 +508,9 @@ void GameManager::Process_packet(int c_id, char* packet)
 			}
 		}
 
+		if (w_map_mng.map[y][x] == MI_ITEM) {
+			w_map_mng.Change_Map(x, y, MI_FREE);
+		}
 		break;
 	}
 	case CS_ATTACK: {
@@ -522,15 +534,13 @@ void GameManager::Process_packet(int c_id, char* packet)
 
 		// 부술 수 있는 벽 공격하면 뿌수기
 		bool blocken_wall = false;
-		w_map_mng.m_lock[s_y][s_x].lock();
 		if (w_map_mng.map[attack.y][attack.x] == static_cast<char>(MI_CRACK_WALL)) {
-			w_map_mng.map[attack.y][attack.x] = MI_ITEM;
+			w_map_mng.Change_Map(attack.x, attack.y, MI_ITEM);
 			blocken_wall = true;
 			clients[c_id].send_change_map_packet(attack.x, attack.y, w_map_mng.map[attack.y][attack.x]);
 		}
-		w_map_mng.m_lock[s_y][s_x].unlock();
 
-
+		// 섹터 말고 뷰리스트 도는거 함 고민해보자
 		for (int y = s_y - 1; y < s_y + 2; ++y) {
 			for (int x = s_x - 1; x < s_x + 2; ++x) {
 				if (y < 0 || y >= (W_HEIGHT / S_HEIGHT) + 1 || x < 0 || x >= (W_WIDTH / S_WIDTH) + 1) continue;
@@ -539,19 +549,26 @@ void GameManager::Process_packet(int c_id, char* packet)
 					if (cl->_state != ST_INGAME) continue;
 					if (Can_see(c_id, cl->_id))
 						cl->send_attack_player_packet(&attack);
-					// 벽을 부쉈으면 다른 플레이어나 npc가 있을수가 없으니까 피 까는거 이런거 넘기기
-					if (blocken_wall) continue;
 					if (cl->_id == c_id) continue;
-					if (cl->x == attack.x && cl->y == attack.y) {
+					if (blocken_wall) {
+						cl->send_change_map_packet(attack.x, attack.y, w_map_mng.map[attack.y][attack.x]);
+					}
+					else if (cl->x == attack.x && cl->y == attack.y) {
 						--cl->hp;
-
+						cout << cl->hp << endl;
 						if (cl->hp <= 0) {
 							cl->_s_lock.lock();
 							cl->_state = ST_FREE;
 							cl->_s_lock.unlock();
 							clients[c_id].send_death_player_packet(cl);
+							if (Is_player(cl->_id))
+								cl->send_death_player_packet(cl);
 						}
-						else clients[c_id].send_hit_player_packet(cl);
+						else {
+							clients[c_id].send_hp_update_packet(cl);
+							if (Is_player(cl->_id))
+								cl->send_hp_update_packet(cl);
+						}
 					}
 				}
 				st_mng._st_lock[y][x].unlock();
