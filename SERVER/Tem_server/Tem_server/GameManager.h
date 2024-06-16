@@ -4,6 +4,7 @@
 #include "SESSION.h"
 	//#include "OVER_PLUS.h"
 #include "SectorManager.h"
+#include "MapManager.h"
 
 class GameManager
 {
@@ -14,6 +15,7 @@ public:
 	concurrency::concurrent_priority_queue<TIMER_EVENT> timer_queue;
 	array<SESSION, MAX_USER + MAX_NPC> clients;
 	SectorManager st_mng;
+	MapManager w_map_mng{};
 
 	GameManager();
 	~GameManager();

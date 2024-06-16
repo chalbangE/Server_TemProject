@@ -34,6 +34,7 @@ unordered_map <int, Player>		players;
 SOCKET							send_socket, server_soket;
 WSAOVERLAPPED					wsaover;
 vector<Effect>					effect;
+char							w_map[W_HEIGHT][W_WIDTH]{};
 
 void Client_Login();
 void Send_Packet(void* packet);
@@ -109,10 +110,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 	HPEN hPen, oldPen;
 	RECT window{ 0, 0, 840, 840 };
 
-	static CImage ch_img, npc_img, other_ch_img, effect_img, hpbar_img;
+	static CImage ch_img, npc_img, other_ch_img, effect_img, hpbar_img, wall_img;
 	static array<CImage, 2> bg_tile_img;
 
 	static bool control_on = false;
+
 
 	// 메세지 처리하기
 	switch (uMsg) {
@@ -128,6 +130,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 			npc_img.Load(TEXT("IMG/npc28-28.png"));
 			effect_img.Load(TEXT("IMG/Effect28-28.png"));
 			hpbar_img.Load(TEXT("IMG/targetHPbar30-30.png"));
+			wall_img.Load(TEXT("IMG/wall31-25.png"));
 		}
 
 		Client_Login();
@@ -185,6 +188,26 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 			// 이펙트
 			for (const auto& e : effect) {
 				effect_img.Draw(mdc, ((10 - (my_x - e.x)) * (TILE_SIZE)) + 5, ((10 - (my_y - e.y)) * (TILE_SIZE)) + 5, TILE_SIZE - 10, TILE_SIZE - 10, (e.motion / 3) * 28, int(e.type) * 28, 28, 28);
+			}
+
+			for (int y = my_y - VIEW_RANGE; y < my_y + VIEW_RANGE; ++y) {
+				for (int x = my_x - VIEW_RANGE; x < my_x + VIEW_RANGE; ++x) {
+					if (w_map[y][x] == MI_FREE) continue;
+					if (y < 0 || y >= W_HEIGHT || x < 0 || x >= W_WIDTH) continue;
+					switch (w_map[y][x])
+					{
+					case MI_SOILD_WALL:
+					case MI_CRACK_WALL: {
+						wall_img.Draw(mdc, ((10 - (my_x - x)) * (TILE_SIZE)) + 5, ((10 - (my_y - y)) * (TILE_SIZE)) + 5, TILE_SIZE - 10, TILE_SIZE - 10, (int(w_map[y][x]) - 1) * 31, 0, 31, 25);
+						break;
+					}
+					case MI_ITEM: {
+						break;
+					}
+					default:
+						break;
+					}
+				}
 			}
 
 			ch_img.Draw(mdc, (10 * TILE_SIZE) + 5, (10 * TILE_SIZE) + 5, TILE_SIZE - 10, TILE_SIZE - 10, (my_motion / 5) * 28, int(my_dir) * 28, 28, 28);
@@ -455,6 +478,16 @@ void Using_Packet(char* packet_ptr)
 			effect.emplace_back(EFFECT_TYPE::ET_OP_ATTACK, packet->x, packet->y);
 		else
 			effect.emplace_back(EFFECT_TYPE::ET_NPC_ATTACK, packet->x, packet->y);
+		break;
+	}
+	case SC_CHANGE_MAP: {
+		SC_CHANGE_MAP_PACKET* packet = reinterpret_cast<SC_CHANGE_MAP_PACKET*>(packet_ptr);
+
+		w_map[packet->y][packet->x] = packet->what;
+		cout << packet->x << '\t' << packet->y << '\t' << packet->what << endl;
+		if (packet->what == MI_ITEM) {
+			// 아이템 여러개 만들지 고민 중
+		}
 		break;
 	}
 	default:

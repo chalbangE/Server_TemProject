@@ -38,6 +38,7 @@ public:
 	void send_death_player_packet(SESSION* client);
 	void send_chat_packet(int c_id, const char* mess);
 	void send_remove_player_packet(int c_id);
+	void send_change_map_packet(int x, int y, char what);
 };
 
 

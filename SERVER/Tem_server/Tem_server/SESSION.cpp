@@ -121,3 +121,14 @@ void SESSION::send_remove_player_packet(int c_id)
 	p.type = SC_REMOVE_OBJECT;
 	do_send(&p);
 }
+
+void SESSION::send_change_map_packet(int x, int y, char what)
+{
+	SC_CHANGE_MAP_PACKET p;
+	p.x = x;
+	p.y = y;
+	p.what = what;
+	p.type = SC_CHANGE_MAP;
+	p.size = sizeof(p);
+	do_send(&p);
+}

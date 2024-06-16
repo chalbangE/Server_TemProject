@@ -16,10 +16,7 @@
     <Filter Include="헤더 파일\lua">
       <UniqueIdentifier>{85b510c8-7b71-4552-b4d3-3d51d8926156}</UniqueIdentifier>
     </Filter>
-    <Filter Include="헤더 파일\class.h">
-      <UniqueIdentifier>{16d291fd-02b0-428c-a3c2-8b4b88c5f93c}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="소스 파일\class.cpp">
+    <Filter Include="소스 파일\class">
       <UniqueIdentifier>{b7c3b006-a28b-4cde-88a9-88501db51bd7}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
@@ -31,15 +28,18 @@
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="OVER_PLUS.cpp">
-      <Filter>소스 파일\class.cpp</Filter>
+      <Filter>소스 파일\class</Filter>
     </ClCompile>
     <ClCompile Include="TIMER_EVENT.cpp">
-      <Filter>소스 파일\class.cpp</Filter>
+      <Filter>소스 파일\class</Filter>
     </ClCompile>
     <ClCompile Include="SESSION.cpp">
-      <Filter>소스 파일\class.cpp</Filter>
+      <Filter>소스 파일\class</Filter>
     </ClCompile>
     <ClCompile Include="SectorManager.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="MapManager.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>
@@ -65,19 +65,22 @@
     <ClInclude Include="include\lauxlib.h">
       <Filter>헤더 파일\lua</Filter>
     </ClInclude>
-    <ClInclude Include="TIMER_EVENT.h">
-      <Filter>헤더 파일\class.h</Filter>
+    <ClInclude Include="SectorManager.h">
+      <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="ENUM.h">
-      <Filter>헤더 파일\class.h</Filter>
+      <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="OVER_PLUS.h">
-      <Filter>헤더 파일\class.h</Filter>
+      <Filter>소스 파일\class</Filter>
     </ClInclude>
     <ClInclude Include="SESSION.h">
-      <Filter>헤더 파일\class.h</Filter>
+      <Filter>소스 파일\class</Filter>
     </ClInclude>
-    <ClInclude Include="SectorManager.h">
+    <ClInclude Include="TIMER_EVENT.h">
+      <Filter>소스 파일\class</Filter>
+    </ClInclude>
+    <ClInclude Include="MapManager.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>

@@ -127,6 +127,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="MapManager.cpp" />
     <ClCompile Include="OVER_PLUS.cpp" />
     <ClCompile Include="GameManager.cpp" />
     <ClCompile Include="SectorManager.cpp" />
@@ -139,6 +140,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ENUM.h" />
+    <ClInclude Include="MapManager.h" />
     <ClInclude Include="OVER_PLUS.h" />
     <ClInclude Include="GameManager.h" />
     <ClInclude Include="include\lauxlib.h" />

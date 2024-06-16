@@ -33,6 +33,7 @@ constexpr char SC_STAT_CHANGE		= 8;
 constexpr char SC_HIT				= 9;
 constexpr char SC_ATTACK_OBJECT		= 10;
 constexpr char SC_DEATH				= 11;
+constexpr char SC_CHANGE_MAP		= 12;
 
 #pragma pack (push, 1)
 struct CS_LOGIN_PACKET {
@@ -152,6 +153,14 @@ struct SC_DEATH_PACKET {
 	unsigned short	size;
 	char			type;
 	int				id;
+	int				x;
+	int				y;
+};
+
+struct SC_CHANGE_MAP_PACKET {
+	unsigned short	size;
+	char			type;
+	char			what;
 	int				x;
 	int				y;
 };
