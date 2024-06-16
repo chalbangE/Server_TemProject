@@ -143,13 +143,13 @@ void GameManager::Worker_thread()
 			bool keep_alive = false;
 			int s_y = clients[key].y / S_HEIGHT;
 			int s_x = clients[key].x / S_WIDTH;
-			for (int y = -1; y < s_y + 2; ++y) {
+			for (int y = s_y - 1; y < s_y + 2; ++y) {
 				for (int x = s_x - 1; x < s_x + 2; ++x) {
-					if (y < 0 || y >= W_HEIGHT / S_HEIGHT || x < 0 || x >= W_WIDTH / S_WIDTH) continue;
+					if (y < 0 || y >= (W_HEIGHT / S_HEIGHT) + 1 || x < 0 || x >= (W_WIDTH / S_WIDTH) + 1) continue;
 					st_mng._st_lock[y][x].lock();
 					for (auto& j : st_mng.sector_list[y][x]) {
 						if (j->_state != ST_INGAME) continue;
-						if (!Is_player(j->_id)) continue;
+						if (!Is_npc(j->_id)) continue;
 						if (Can_see(static_cast<int>(key), j->_id)) {
 							keep_alive = true;
 							ex_over->_ai_target_obj = j->_id;
@@ -203,7 +203,7 @@ void GameManager::Do_timer()
 
 void GameManager::WakeUpNPC(int npc_id, int waker)
 {
-	if (clients[npc_id]._is_active) return;
+	if (clients[npc_id]._is_active || !Is_npc(npc_id)) return;
 	bool old_state = false;
 	if (false == atomic_compare_exchange_strong(&clients[npc_id]._is_active, &old_state, true))
 		return;
@@ -279,7 +279,7 @@ void GameManager::Do_npc_random_move(int npc_id)
 
 		npc.x = x;
 		npc.y = y;
-		st_mng.SLInsert(&clients[npc_id]);
+		st_mng.SLInsert(&npc);
 	}
 
 	npc.x = x;
@@ -376,6 +376,8 @@ void GameManager::Process_packet(int c_id, char* packet)
 
 		st_mng.SLInsert(&clients[c_id]);
 
+		clients[c_id].send_login_info_packet();
+
 		for (int y = s_y - 1; y < s_y + 2; ++y) {
 			for (int x = s_x - 1; x < s_x + 2; ++x) {
 				if (y < 0 || y >= (W_HEIGHT / S_HEIGHT) + 1 || x < 0 || x >= (W_WIDTH / S_WIDTH) + 1) continue;
@@ -388,14 +390,12 @@ void GameManager::Process_packet(int c_id, char* packet)
 					if (cl->_id == c_id) continue;
 					if (false == Can_see(c_id, cl->_id)) continue;
 					if (Is_player(cl->_id)) cl->send_add_player_packet(&clients[c_id]);
-					else WakeUpNPC(cl->_id, c_id);
+					else WakeUpNPC(c_id, cl->_id);
 					clients[c_id].send_add_player_packet(cl);
 				}
 				st_mng._st_lock[y][x].unlock();
 			}
 		}
-
-		clients[c_id].send_login_info_packet();
 
 		break;
 	}
