@@ -11,12 +11,12 @@ class OVER_PLUS
 public:
 	WSAOVERLAPPED _over;
 	WSABUF _wsabuf;
-	char _send_buf[CHAT_SIZE];
+	char _send_buf[CHAT_SIZE * 2];
 	COMP_TYPE _comp_type;
 	int _ai_target_obj;
 
 	OVER_PLUS() {
-		_wsabuf.len = CHAT_SIZE;
+		_wsabuf.len = CHAT_SIZE * 2;
 		_wsabuf.buf = _send_buf;
 		_comp_type = OP_RECV;
 		ZeroMemory(&_over, sizeof(_over));

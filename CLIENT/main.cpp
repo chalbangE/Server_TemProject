@@ -34,6 +34,8 @@ vector<Effect>					effect;
 char							w_map[W_HEIGHT][W_WIDTH]{};
 array<POINT, 3>					ui_start{};
 array<int, 3>					draw_hpbar_id{ -1 }; // hp바 그려야하는 애들 id / 직전에 때린 적, 파티원 1, 파티원 2 순서
+char							chat_str[CHAT_SIZE] = "김유콩 김유콩 김유콩 김유콩 김유콩 김유콩 김유콩 김유콩 김유콩 김유콩 김유콩 김유콩 김유콩 김유콩 김유콩 김유콩 김유콩 김유콩 김유콩 김유콩 김유콩 김유콩 김유콩 김유콩 김유콩 ";
+char							now_chat_str[CHAT_SIZE]{};
 
 enum UI_START {
 	US_MY_HP, US_TARGET_HP, US_PARTY_HP
@@ -111,14 +113,16 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 	HDC hdc{}; HDC mdc{};
 	HBITMAP HBitmap, OldBitmap;
 	HPEN hPen, oldPen;
+	HFONT hFont, OldFont;
 	RECT window{ 0, 0, 840, 840 };
-	
 
 	static CImage ch_img, npc_img, other_ch_img, effect_img, hpbar_img, wall_img;
 	static array<CImage, 2> bg_tile_img;
 
-	static bool control_on = false;
+	static bool control_on = false, chat_on = false;
 
+	const wchar_t* fontPath = L"PF스타더스트.ttf";
+	AddFontResource(fontPath);
 
 	// 메세지 처리하기
 	switch (uMsg) {
@@ -138,6 +142,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 		}
 
 		Client_Login();
+		ui_start[US_TARGET_HP] = { 10, 10 };
 
 		SetTimer(hWnd, 2, 10, 0);
 		break;
@@ -239,9 +244,39 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 				}
 			}
 
+			// 채팅 그리기
+			{
+				hFont = CreateFont(22, 0, 0, 0, 400, NULL, NULL, NULL, NULL, 10, 2, 1, 50, L"PF스타더스트");
+				OldFont = (HFONT)SelectObject(mdc, hFont);
+				SetTextColor(mdc, RGB(0, 0, 0));
+				SetBkMode(mdc, RGB(255, 255, 255));
+
+				// 출력할 텍스트 설정
+				RECT rect;
+				rect.left = 10;     // 왼쪽 시작 좌표
+				rect.top = WIN_SIZE.y;     // 아래쪽에서 시작
+				rect.right = WIN_SIZE.x / 2;   // 가로 길이 제한
+
+				// 내가 치고 있는 채팅
+				DrawTextA(mdc, now_chat_str, -1, &rect, DT_WORDBREAK | DT_LEFT | DT_CALCRECT);
+				int textHeight = rect.bottom - rect.top; // 텍스트의 높이
+				rect.top -= textHeight + 10;     // 위로 올림
+				DrawTextA(mdc, now_chat_str, -1, &rect, DT_WORDBREAK | DT_LEFT);
+
+				rect.right = WIN_SIZE.x / 2;   // 가로 길이 제한
+				SetBkMode(mdc, TRANSPARENT);
+				// 내가 치고 있는 채팅 위로 직전 채팅
+				DrawTextA(mdc, chat_str, -1, &rect, DT_WORDBREAK | DT_LEFT | DT_CALCRECT);
+				textHeight = rect.bottom - rect.top; // 텍스트의 높이
+				rect.top -= textHeight + 10;     // 위로 올림
+				DrawTextA(mdc, chat_str, -1, &rect, DT_WORDBREAK | DT_LEFT);
+
+				SelectObject(mdc, OldFont);
+				DeleteObject(hFont);
+			}
+
 			BitBlt(hdc, 0, 0, window.right, window.bottom, mdc, 0, 0, SRCCOPY);
 
-			SelectObject(mdc, OldBitmap);
 			DeleteObject(HBitmap);
 			DeleteDC(mdc);
 			EndPaint(hWnd, &ps);
@@ -277,10 +312,34 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 	case WM_KEYDOWN: {
 		//direction |  // 0 : RIGHT, 1 : LEFT, 2 : UP, 3 : DOWN
 		char direction = -1;
+      
+		if (chat_on) {
+			if (wParam == VK_BACK) {
+				int len = strlen(now_chat_str);
+				if (len > 0)
+					now_chat_str[len - 1] = '\0';  // 마지막 문자 제거
+			}
+			else if (wParam == VK_RETURN) {
+				chat_on = false;
+				if (0 == strlen(now_chat_str)) break;
+				CS_CHAT_PACKET p;
+				strcpy_s(p.mess, CHAT_SIZE, now_chat_str);
+				memset(now_chat_str, '\0', sizeof(now_chat_str));
+				p.size = sizeof(p);
+				p.type = CS_CHAT;
+
+				Send_Packet(&p);
+			}
+			break;
+		}
 
 		switch (wParam) {
 		case VK_CONTROL: {
 			control_on = true;
+			break;
+		} 
+		case VK_RETURN: {
+			chat_on = true;
 			break;
 		}
 		case 'd':
@@ -324,6 +383,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 			control_on = false;
 			break;
 		}
+		}
+		break;
+	}
+	case WM_CHAR: {
+		if (strlen(now_chat_str) < CHAT_SIZE - 1 && chat_on) { // 공간이 남아 있을 때만 추가 
+			if (wParam == VK_RETURN || wParam == VK_BACK) break;
+			int len = strlen(now_chat_str);
+			now_chat_str[len] = (TCHAR)wParam;
+			now_chat_str[len + 1] = '\0';  // 문자열 끝에 null 문자 추가
 		}
 		break;
 	}
@@ -381,9 +449,9 @@ void CALLBACK recv_callback(DWORD err, DWORD recv_size, LPWSAOVERLAPPED pwsaover
 
 	static size_t save_data_size = 0;
 	static size_t one_packet_size = 0;
-	static char save_buf[CHAT_SIZE];
+	static char save_buf[CHAT_SIZE * 2];
 	char* buf = over->_wsabuf.buf;
-	char recv_buf[CHAT_SIZE];
+	char recv_buf[CHAT_SIZE * 2];
 
 	if (save_data_size > 0) { // 전에 잘려서 저장해둔 패킷이 있으면 그거부터 하기
 		memcpy(recv_buf, save_buf, save_data_size);
@@ -396,13 +464,20 @@ void CALLBACK recv_callback(DWORD err, DWORD recv_size, LPWSAOVERLAPPED pwsaover
 
 	while (1) {
 		if (recv_size == 0) break; // 남은 데이터가 없으면 끝
-		one_packet_size = buf[0]; // 패킷 하나 사이즈 등록하기
+		if (buf[2] == SC_CHAT) {
+			cout << 'd' << endl;
+		}
+		WORD* byte = reinterpret_cast<WORD*>(buf);
+		one_packet_size = *byte; // 패킷 하나 사이즈 등록하기
 		if (one_packet_size > recv_size) { // 패킷 하나 사이즈보다 남은 버퍼 크기가 더 작으면 잘린거니까 save하기
 			memcpy(save_buf, buf, recv_size);
 			save_data_size = recv_size;
 			break;
 		}
 		memcpy(recv_buf, buf, one_packet_size);
+		if (recv_buf[2] == SC_CHAT) {
+			cout << 'd' << endl;
+		}
 		Using_Packet(recv_buf);
 		buf += one_packet_size;
 		recv_size -= one_packet_size;
@@ -430,8 +505,7 @@ void Using_Packet(char* packet_ptr)
 
 		my_info = players[my_info.id];
 
-		ui_start[US_MY_HP] = { (WIN_SIZE.x / 2) - long(float(my_info.max_hp) / 2.f * 50), WIN_SIZE.y - 60 };
-		my_info.hp = 2;
+		ui_start[US_MY_HP] = { WIN_SIZE.x - (my_info.max_hp * 50) - 10, WIN_SIZE.y - 60 };
 		break;
 	}
 	case SC_LOGIN_FAIL: {
@@ -473,6 +547,8 @@ void Using_Packet(char* packet_ptr)
 	}
 	case SC_CHAT: {
 		SC_CHAT_PACKET* packet = reinterpret_cast<SC_CHAT_PACKET*>(packet_ptr);
+
+		snprintf(chat_str, sizeof(chat_str), "%d : %s", packet->id, packet->mess);
 		break;
 	}
 	case SC_STAT_CHANGE: {
@@ -490,7 +566,6 @@ void Using_Packet(char* packet_ptr)
 
 		if (players[packet->id].hp > packet->hp) {
 			draw_hpbar_id[0] = packet->id;
-			ui_start[US_TARGET_HP] = { (WIN_SIZE.x / 2) - long(float(players[packet->id].max_hp) / 2.f * 50), 10 };
 		}
 		players[packet->id].hp = packet->hp;
 
@@ -525,10 +600,6 @@ void Using_Packet(char* packet_ptr)
 		w_map[packet->y][packet->x] = packet->what;
 		if (packet->what == MI_ITEM) {
 			// 아이템 여러개 만들지 고민 중
-		}
-		if (packet->what == MI_FREE) {
-			// 아이템 여러개 만들지 고민 중
-			cout << "바꿧땅!!" << endl;
 		}
 		break;
 	}

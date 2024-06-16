@@ -119,7 +119,8 @@ void GameManager::Worker_thread()
 			int remain_data = num_bytes + clients[key]._prev_remain;
 			char* p = ex_over->_send_buf;
 			while (remain_data > 0) {
-				int packet_size = p[0];
+				WORD* byte = reinterpret_cast<WORD*>(p);
+				int packet_size = *byte;
 				if (packet_size <= remain_data) {
 					Process_packet(static_cast<int>(key), p);
 					p = p + packet_size;
@@ -574,6 +575,27 @@ void GameManager::Process_packet(int c_id, char* packet)
 				st_mng._st_lock[y][x].unlock();
 			}
 		}
+
+		break;
+	}
+	case CS_CHAT: {
+		CS_CHAT_PACKET* p = reinterpret_cast<CS_CHAT_PACKET*>(packet);
+
+		int s_x = clients[c_id].x / S_HEIGHT;
+		int s_y = clients[c_id].y / S_WIDTH;
+
+		for (int y = s_y - 1; y < s_y + 2; ++y) {
+			for (int x = s_x - 1; x < s_x + 2; ++x) {
+				if (y < 0 || y >= (W_HEIGHT / S_HEIGHT) + 1 || x < 0 || x >= (W_WIDTH / S_WIDTH) + 1) continue;
+				st_mng._st_lock[y][x].lock();
+				for (auto& cl : st_mng.sector_list[y][x]) {
+					if (cl->_state != ST_INGAME) continue;
+					cl->send_chat_packet(c_id, p->mess);
+				}
+				st_mng._st_lock[y][x].unlock();
+			}
+		}
+		break;
 	}
 	}
 }

@@ -4,6 +4,7 @@
 #include <iostream>
 #include <atlImage.h>
 #include <string>
+#include <cstring>
 #include <vector>
 #include <queue>
 #include <algorithm>

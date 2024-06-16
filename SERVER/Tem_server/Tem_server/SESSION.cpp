@@ -18,7 +18,7 @@ void SESSION::do_recv()
 {
 	DWORD recv_flag = 0;
 	memset(&_recv_over._over, 0, sizeof(_recv_over._over));
-	_recv_over._wsabuf.len = CHAT_SIZE - _prev_remain;
+	_recv_over._wsabuf.len = (CHAT_SIZE * 2) - _prev_remain;
 	_recv_over._wsabuf.buf = _recv_over._send_buf + _prev_remain;
 
 	WSARecv(_socket, &_recv_over._wsabuf, 1, 0, &recv_flag, &_recv_over._over, 0);
@@ -105,7 +105,15 @@ void SESSION::send_attack_player_packet(SESSION* client)
 	do_send(&attack_packet);
 }
 
-void SESSION::send_chat_packet(int c_id, const char* mess) {}
+void SESSION::send_chat_packet(int c_id, const char* mess) 
+{
+	SC_CHAT_PACKET chat_packet;
+	chat_packet.id = c_id;
+	strcpy_s(chat_packet.mess, mess);
+	chat_packet.type = SC_CHAT;
+	chat_packet.size = sizeof(chat_packet);
+	do_send(&chat_packet);
+}
 
 void SESSION::send_remove_player_packet(int c_id)
 {
