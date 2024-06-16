@@ -385,7 +385,7 @@ void GameManager::Process_packet(int c_id, char* packet)
 					if (cl->_id == c_id) continue;
 					if (false == Can_see(c_id, cl->_id)) continue;
 					if (Is_player(cl->_id)) cl->send_add_player_packet(&clients[c_id]);
-					else WakeUpNPC(c_id, cl->_id);
+					else WakeUpNPC(cl->_id, c_id);
 					clients[c_id].send_add_player_packet(cl);
 				}
 				st_mng._st_lock[y][x].unlock();

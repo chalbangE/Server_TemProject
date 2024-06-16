@@ -34,7 +34,7 @@ vector<Effect>					effect;
 char							w_map[W_HEIGHT][W_WIDTH]{};
 array<POINT, 3>					ui_start{};
 array<int, 3>					draw_hpbar_id{ -1 }; // hp¹Ù ±×·Á¾ßÇÏ´Â ¾Öµé id / Á÷Àü¿¡ ¶§¸° Àû, ÆÄÆ¼¿ø 1, ÆÄÆ¼¿ø 2 ¼ø¼­
-char							chat_str[CHAT_SIZE] = "±èÀ¯Äá ±èÀ¯Äá ±èÀ¯Äá ±èÀ¯Äá ±èÀ¯Äá ±èÀ¯Äá ±èÀ¯Äá ±èÀ¯Äá ±èÀ¯Äá ±èÀ¯Äá ±èÀ¯Äá ±èÀ¯Äá ±èÀ¯Äá ±èÀ¯Äá ±èÀ¯Äá ±èÀ¯Äá ±èÀ¯Äá ±èÀ¯Äá ±èÀ¯Äá ±èÀ¯Äá ±èÀ¯Äá ±èÀ¯Äá ±èÀ¯Äá ±èÀ¯Äá ±èÀ¯Äá ";
+char							chat_str[CHAT_SIZE]{};
 char							now_chat_str[CHAT_SIZE]{};
 
 enum UI_START {
@@ -121,7 +121,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 
 	static bool control_on = false, chat_on = false;
 
-	const wchar_t* fontPath = L"PF½ºÅ¸´õ½ºÆ®.ttf";
+	const wchar_t* fontPath = L"Ramche.ttf";
 	AddFontResource(fontPath);
 
 	// ¸Þ¼¼Áö Ã³¸®ÇÏ±â
@@ -139,6 +139,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 			effect_img.Load(TEXT("IMG/Effect28-28.png"));
 			hpbar_img.Load(TEXT("IMG/Hpbar50-50.png"));
 			wall_img.Load(TEXT("IMG/wall31-25.png"));
+			// wall_img.Load(TEXT("IMG/Login.png")); // 212 584
 		}
 
 		Client_Login();
@@ -246,7 +247,16 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 
 			// Ã¤ÆÃ ±×¸®±â
 			{
-				hFont = CreateFont(22, 0, 0, 0, 400, NULL, NULL, NULL, NULL, 10, 2, 1, 50, L"PF½ºÅ¸´õ½ºÆ®");
+				hFont = CreateFont(18, 0, 0, 0, 400, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
+					CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Ramche");
+				if (!hFont) {
+					DWORD dwError = GetLastError();
+					LPWSTR lpMsgBuf;
+					FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+						NULL, dwError, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR)&lpMsgBuf, 0, NULL);
+					MessageBox(hWnd, lpMsgBuf, L"Font creation failed!", MB_OK | MB_ICONERROR);
+					LocalFree(lpMsgBuf);
+				}
 				OldFont = (HFONT)SelectObject(mdc, hFont);
 				SetTextColor(mdc, RGB(0, 0, 0));
 				SetBkMode(mdc, RGB(255, 255, 255));
@@ -261,6 +271,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 				DrawTextA(mdc, now_chat_str, -1, &rect, DT_WORDBREAK | DT_LEFT | DT_CALCRECT);
 				int textHeight = rect.bottom - rect.top; // ÅØ½ºÆ®ÀÇ ³ôÀÌ
 				rect.top -= textHeight + 10;     // À§·Î ¿Ã¸²
+				rect.right = WIN_SIZE.x / 2;   // °¡·Î ±æÀÌ Á¦ÇÑ
 				DrawTextA(mdc, now_chat_str, -1, &rect, DT_WORDBREAK | DT_LEFT);
 
 				rect.right = WIN_SIZE.x / 2;   // °¡·Î ±æÀÌ Á¦ÇÑ
@@ -269,6 +280,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 				DrawTextA(mdc, chat_str, -1, &rect, DT_WORDBREAK | DT_LEFT | DT_CALCRECT);
 				textHeight = rect.bottom - rect.top; // ÅØ½ºÆ®ÀÇ ³ôÀÌ
 				rect.top -= textHeight + 10;     // À§·Î ¿Ã¸²
+				rect.right = WIN_SIZE.x / 2;   // °¡·Î ±æÀÌ Á¦ÇÑ
 				DrawTextA(mdc, chat_str, -1, &rect, DT_WORDBREAK | DT_LEFT);
 
 				SelectObject(mdc, OldFont);
