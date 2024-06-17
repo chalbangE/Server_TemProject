@@ -73,9 +73,10 @@ void SESSION::send_add_player_packet(SESSION* client)
 	do_send(&add_packet);
 }
 
-void SESSION::send_hp_update_packet(SESSION* client)
+void SESSION::send_hp_update_packet(SESSION* client, int at_id)
 {
 	SC_HP_UPDATE_PACKET hit_packet;
+	hit_packet.attack_id = at_id;
 	hit_packet.id = client->_id;
 	hit_packet.hp = client->hp;
 	hit_packet.size = sizeof(hit_packet);

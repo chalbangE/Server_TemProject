@@ -5,10 +5,10 @@ constexpr int NAME_SIZE				= 20;
 constexpr int CHAT_SIZE				= 300;
 
 constexpr int MAX_USER				= 10000;
-constexpr int MAX_NPC				= 200000;
+constexpr int MAX_NPC				= 100;
 
-constexpr int W_WIDTH				= 2000;
-constexpr int W_HEIGHT				= 2000;
+constexpr int W_WIDTH				= 200;
+constexpr int W_HEIGHT				= 200;
 
 constexpr int S_WIDTH				= 20;
 constexpr int S_HEIGHT				= 20;
@@ -127,6 +127,7 @@ struct SC_LOGIN_FAIL_PACKET {
 struct SC_HP_UPDATE_PACKET {
 	unsigned short	size;
 	char			type;
+	int				attack_id;
 	int				id;
 	int				hp;
 	char			hp_uadate_why;

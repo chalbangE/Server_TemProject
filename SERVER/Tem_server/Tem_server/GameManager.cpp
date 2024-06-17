@@ -483,7 +483,7 @@ void GameManager::Process_packet(int c_id, char* packet)
 		clients[c_id].y = y;
 		clients[c_id].send_move_packet(&clients[c_id]);
 		if (w_map_mng.map[y][x] == MI_ITEM) {
-			clients[c_id].send_hp_update_packet(&clients[c_id]);
+			clients[c_id].send_hp_update_packet(&clients[c_id], -1);
 			clients[c_id].send_change_map_packet(x, y, MI_FREE);
 		}
 
@@ -496,7 +496,7 @@ void GameManager::Process_packet(int c_id, char* packet)
 					clients[pl].send_move_packet(&clients[c_id]);
 					
 					if (w_map_mng.map[y][x] == MI_ITEM) {
-						clients[pl].send_hp_update_packet(&clients[c_id]);
+						clients[pl].send_hp_update_packet(&clients[c_id], -1);
 						clients[pl].send_change_map_packet(x, y, MI_FREE);
 					}
 				}
@@ -585,9 +585,9 @@ void GameManager::Process_packet(int c_id, char* packet)
 								cl->send_death_player_packet(cl);
 						}
 						else {
-							clients[c_id].send_hp_update_packet(cl);
+							clients[c_id].send_hp_update_packet(cl, c_id);
 							if (Is_player(cl->_id))
-								cl->send_hp_update_packet(cl);
+								cl->send_hp_update_packet(cl, c_id);
 						}
 					}
 				}

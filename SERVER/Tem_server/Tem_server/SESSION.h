@@ -33,7 +33,7 @@ public:
 	void send_login_info_packet();
 	void send_move_packet(SESSION* client);
 	void send_add_player_packet(SESSION* client);
-	void send_hp_update_packet(SESSION* client);
+	void send_hp_update_packet(SESSION* client, int at_id);
 	void send_attack_player_packet(SESSION* client);
 	void send_death_player_packet(SESSION* client);
 	void send_chat_packet(int c_id, const char* mess);
