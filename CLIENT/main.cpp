@@ -23,7 +23,7 @@ short TILE_NUMBER = 21;
 short TILE_SIZE = WIN_SIZE.x / TILE_NUMBER;
 short TILE_IMG_SIZE = (WIN_SIZE.x / TILE_NUMBER) * 2;
 
-constexpr char SERVER_ADDR[] = "127.0.0.1";
+char SERVER_ADDR[NAME_SIZE]{};
 
 enum UI_START {
 	US_MY_HP, US_TARGET_HP, US_PARTY_HP
@@ -71,6 +71,9 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevinstance, LPSTR IpszCmdPa
 	SOCKADDR_IN server_addr;
 	server_addr.sin_family = AF_INET;
 	server_addr.sin_port = htons(PORT_NUM);
+	//cout << "연결할 서버의 주소를 입력하세용 : ";
+	//cin >> SERVER_ADDR;
+	strcpy_s(SERVER_ADDR, "127.0.0.1");
 	inet_pton(AF_INET, SERVER_ADDR, &server_addr.sin_addr);
 
 	connect(server_soket, reinterpret_cast<sockaddr*>(&server_addr), sizeof(server_addr));
@@ -97,7 +100,7 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevinstance, LPSTR IpszCmdPa
 	WndClass.hIconSm = LoadIcon(NULL, IDI_APPLICATION);
 	RegisterClassEx(&WndClass);
 
-	hWnd = CreateWindow(IpszClass, L"TemProject", WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_BORDER | WS_MINIMIZEBOX | WS_MAXIMIZEBOX, 0, 0, 
+	hWnd = CreateWindow(IpszClass, L"Yum!", WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_BORDER | WS_MINIMIZEBOX | WS_MAXIMIZEBOX, 0, 0, 
 		WIN_SIZE.x, WIN_SIZE.y, NULL, (HMENU)NULL, hinstance, NULL);
 	ShowWindow(hWnd, nCmdShow);
 	UpdateWindow(hWnd);
@@ -275,7 +278,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 
 					// 출력할 텍스트 설정
 					RECT rect;
-					rect.left = (my_info.x - p.second.x) * (TILE_SIZE);     // 왼쪽 시작 좌표
+					rect.left = ((10 - (my_info.x - p.second.x)) * (TILE_SIZE));     // 왼쪽 시작 좌표
 					rect.right = rect.left + TILE_SIZE;   // 가로 길이 제한
 					rect.top = ((10 - (my_info.y - p.second.y)) * (TILE_SIZE)) + TILE_SIZE;    
 					rect.bottom = ((10 - (my_info.y - p.second.y)) * (TILE_SIZE)) + TILE_SIZE + (TILE_SIZE / 2); 
@@ -474,7 +477,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 			}
 
 			chrono::system_clock::time_point now = chrono::system_clock::now();
-			if (-1 != direction && last_move_time <= now - 1s) {
+			if (-1 != direction && last_move_time <= now - 0.1s) {
 				my_info.dir = direction;
 				CS_MOVE_PACKET p;
 				p.size = sizeof(p);
