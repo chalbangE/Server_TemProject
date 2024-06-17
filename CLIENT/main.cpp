@@ -224,100 +224,45 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 			break;
 		}
 		case WM_PAINT: {
-			if (my_info.id != -1) {
-				hdc = BeginPaint(hWnd, &ps);
-				mdc = CreateCompatibleDC(hdc);
-				HBitmap = CreateCompatibleBitmap(hdc, window.right, window.bottom);
-				OldBitmap = (HBITMAP)SelectObject(mdc, (HBITMAP)HBitmap);
-				FillRect(mdc, &window, 0);
+			hdc = BeginPaint(hWnd, &ps);
+			mdc = CreateCompatibleDC(hdc);
+			HBitmap = CreateCompatibleBitmap(hdc, window.right, window.bottom);
+			OldBitmap = (HBITMAP)SelectObject(mdc, (HBITMAP)HBitmap);
+			FillRect(mdc, &window, 0);
 
-				// 배경 타일 깔기
-				{
-					if (my_info.x % 2 == my_info.y % 2) {
-						bg_tile_img[0].Draw(mdc, 0, 0, WIN_SIZE.x, WIN_SIZE.x, 0, 0, WIN_SIZE.x, WIN_SIZE.x);
-					}
-					else {
-						bg_tile_img[1].Draw(mdc, 0, 0, WIN_SIZE.x, WIN_SIZE.x, 0, 0, WIN_SIZE.x, WIN_SIZE.x);
-					}
-
-					hPen = CreatePen(PS_SOLID, 1, RGB(255, 255, 255));
-					oldPen = (HPEN)SelectObject(mdc, hPen);
-					if (my_info.x < TILE_NUMBER / 2 || my_info.y < TILE_NUMBER / 2) {
-						Rectangle(mdc, 0, 0, ((TILE_NUMBER / 2) - my_info.x) * TILE_SIZE, WIN_SIZE.x); // 세로 네모
-						Rectangle(mdc, 0, 0, WIN_SIZE.x, ((TILE_NUMBER / 2) - my_info.y) * TILE_SIZE); // 가로 네모
-					}
-					if ((W_WIDTH - my_info.x) <= (TILE_NUMBER / 2) || (W_HEIGHT - my_info.y) <= (TILE_NUMBER / 2)) {
-						Rectangle(mdc, ((WIN_SIZE.x / 2) + (W_WIDTH - my_info.x) * TILE_SIZE) - (TILE_SIZE / 2), 0, WIN_SIZE.x, WIN_SIZE.x); // 세로 네모
-						Rectangle(mdc, 0, ((WIN_SIZE.x / 2) + (W_HEIGHT - my_info.y) * TILE_SIZE) - (TILE_SIZE / 2), WIN_SIZE.x, WIN_SIZE.x); // 세로 네모
-					}
-					SelectObject(mdc, oldPen);
-					DeleteObject(hPen);
+			// 배경 타일 깔기
+			{
+				if (my_info.x % 2 == my_info.y % 2) {
+					bg_tile_img[0].Draw(mdc, 0, 0, WIN_SIZE.x, WIN_SIZE.x, 0, 0, WIN_SIZE.x, WIN_SIZE.x);
+				}
+				else {
+					bg_tile_img[1].Draw(mdc, 0, 0, WIN_SIZE.x, WIN_SIZE.x, 0, 0, WIN_SIZE.x, WIN_SIZE.x);
 				}
 
-
-				// 그리기 (플레이어)
-				for (const auto& p : players) {
-					if (p.second.id >= MAX_USER)
-						npc_img.Draw(mdc, ((10 - (my_info.x - p.second.x)) * (TILE_SIZE)) + 5, ((10 - (my_info.y - p.second.y)) * (TILE_SIZE)) + 5, TILE_SIZE - 10, TILE_SIZE - 10, (my_motion / 5) * 28, int(p.second.dir) * 28, 28, 28);
-					else if (p.second.id == my_info.id) continue;
-					else other_ch_img.Draw(mdc, ((10 - (my_info.x - p.second.x)) * (TILE_SIZE)) + 5, ((10 - (my_info.y - p.second.y)) * (TILE_SIZE)) + 5, TILE_SIZE - 10, TILE_SIZE - 10, (my_motion / 5) * 28, int(p.second.dir) * 28, 28, 28);
+				hPen = CreatePen(PS_SOLID, 1, RGB(255, 255, 255));
+				oldPen = (HPEN)SelectObject(mdc, hPen);
+				if (my_info.x < TILE_NUMBER / 2 || my_info.y < TILE_NUMBER / 2) {
+					Rectangle(mdc, 0, 0, ((TILE_NUMBER / 2) - my_info.x) * TILE_SIZE, WIN_SIZE.x); // 세로 네모
+					Rectangle(mdc, 0, 0, WIN_SIZE.x, ((TILE_NUMBER / 2) - my_info.y) * TILE_SIZE); // 가로 네모
 				}
-
-				for (int y = my_info.y - VIEW_RANGE; y < my_info.y + VIEW_RANGE; ++y) {
-					for (int x = my_info.x - VIEW_RANGE; x < my_info.x + VIEW_RANGE; ++x) {
-						if (w_map[y][x] == MI_FREE) continue;
-						if (y < 0 || y >= W_HEIGHT || x < 0 || x >= W_WIDTH) continue;
-						switch (w_map[y][x])
-						{
-						case MI_SOILD_WALL:
-						case MI_CRACK_WALL:
-						case MI_ITEM: {
-							wall_img.Draw(mdc, ((10 - (my_info.x - x)) * (TILE_SIZE)) + 5, ((10 - (my_info.y - y)) * (TILE_SIZE)) + 5, TILE_SIZE - 10, TILE_SIZE - 10, (int(w_map[y][x]) - 1) * 31, 0, 31, 25);
-							break;
-						}
-						default:
-							break;
-						}
-					}
+				if ((W_WIDTH - my_info.x) <= (TILE_NUMBER / 2) || (W_HEIGHT - my_info.y) <= (TILE_NUMBER / 2)) {
+					Rectangle(mdc, ((WIN_SIZE.x / 2) + (W_WIDTH - my_info.x) * TILE_SIZE) - (TILE_SIZE / 2), 0, WIN_SIZE.x, WIN_SIZE.x); // 세로 네모
+					Rectangle(mdc, 0, ((WIN_SIZE.x / 2) + (W_HEIGHT - my_info.y) * TILE_SIZE) - (TILE_SIZE / 2), WIN_SIZE.x, WIN_SIZE.x); // 세로 네모
 				}
+				SelectObject(mdc, oldPen);
+				DeleteObject(hPen);
+			}
 
-				// 이펙트
-				for (const auto& e : effect) {
-					effect_img.Draw(mdc, ((10 - (my_info.x - e.x)) * (TILE_SIZE)) + 5, ((10 - (my_info.y - e.y)) * (TILE_SIZE)) + 5, TILE_SIZE - 10, TILE_SIZE - 10, (e.motion / 3) * 28, int(e.type) * 28, 28, 28);
-				}
 
-				ch_img.Draw(mdc, (10 * TILE_SIZE) + 5, (10 * TILE_SIZE) + 5, TILE_SIZE - 10, TILE_SIZE - 10, (my_motion / 5) * 28, int(my_info.dir) * 28, 28, 28);
+			// 그리기 (플레이어)
+			for (const auto& p : players) {
+				if (p.second.id >= MAX_USER)
+					npc_img.Draw(mdc, ((10 - (my_info.x - p.second.x)) * (TILE_SIZE)) + 5, ((10 - (my_info.y - p.second.y)) * (TILE_SIZE)) + 5, TILE_SIZE - 10, TILE_SIZE - 10, (my_motion / 5) * 28, int(p.second.dir) * 28, 28, 28);
+				else if (p.second.id == my_info.id) continue;
+				else {
+					other_ch_img.Draw(mdc, ((10 - (my_info.x - p.second.x)) * (TILE_SIZE)) + 5, ((10 - (my_info.y - p.second.y)) * (TILE_SIZE)) + 5, TILE_SIZE - 10, TILE_SIZE - 10, (my_motion / 5) * 28, int(p.second.dir) * 28, 28, 28);
 
-				// 내 HP바
-				for (int i = 1; i <= my_info.max_hp; ++i) {
-					if (i <= my_info.hp)
-						hpbar_img.Draw(mdc, ui_start[US_MY_HP].x + ((i - 1) * 50), ui_start[US_MY_HP].y, 50, 50, 50, 0, 50, 50);
-					else
-						hpbar_img.Draw(mdc, ui_start[US_MY_HP].x + ((i - 1) * 50), ui_start[US_MY_HP].y, 50, 50, 0, 0, 50, 50);
-				}
-				// 마지막으로 때린 놈 HP바
-				if (draw_hpbar_id[0] != -1) {
-					if (draw_hpbar_id[0] < MAX_USER) {
-						for (int i = 1; i <= players[draw_hpbar_id[0]].max_hp; ++i) {
-							if (i <= players[draw_hpbar_id[0]].hp)
-								hpbar_img.Draw(mdc, ui_start[US_TARGET_HP].x + ((i - 1) * 50), ui_start[US_TARGET_HP].y, 50, 50, 100, 0, 50, 50);
-							else
-								hpbar_img.Draw(mdc, ui_start[US_TARGET_HP].x + ((i - 1) * 50), ui_start[US_TARGET_HP].y, 50, 50, 0, 0, 50, 50);
-						}
-					}
-					else {
-						for (int i = 1; i <= players[draw_hpbar_id[0]].max_hp; ++i) {
-							if (i <= players[draw_hpbar_id[0]].hp)
-								hpbar_img.Draw(mdc, ui_start[US_TARGET_HP].x + ((i - 1) * 50), ui_start[US_TARGET_HP].y, 50, 50, 150, 0, 50, 50);
-							else
-								hpbar_img.Draw(mdc, ui_start[US_TARGET_HP].x + ((i - 1) * 50), ui_start[US_TARGET_HP].y, 50, 50, 0, 0, 50, 50);
-						}
-					}
-				}
-
-				// 채팅 그리기
-				{
-					hFont = CreateFont(18, 0, 0, 0, 400, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
+					hFont = CreateFont(10, 0, 0, 0, 400, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
 						CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Ramche");
 					OldFont = (HFONT)SelectObject(mdc, hFont);
 					SetTextColor(mdc, RGB(0, 0, 0));
@@ -325,36 +270,110 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 
 					// 출력할 텍스트 설정
 					RECT rect;
-					rect.left = 10;     // 왼쪽 시작 좌표
-					rect.top = WIN_SIZE.y;     // 아래쪽에서 시작
-					rect.right = WIN_SIZE.x / 2;   // 가로 길이 제한
+					rect.left = (10 - (my_info.x - p.second.x)) * (TILE_SIZE) + 5;     // 왼쪽 시작 좌표
+					rect.right = rect.left + TILE_SIZE;   // 가로 길이 제한
+					rect.top = ((10 - (my_info.y - p.second.y)) * (TILE_SIZE)) + TILE_SIZE;    
+					rect.bottom = ((10 - (my_info.y - p.second.y)) * (TILE_SIZE)) + TILE_SIZE + (TILE_SIZE / 2); 
 
 					// 내가 치고 있는 채팅
-					DrawTextA(mdc, now_chat_str, -1, &rect, DT_WORDBREAK | DT_LEFT | DT_CALCRECT);
-					int textHeight = rect.bottom - rect.top; // 텍스트의 높이
-					rect.top -= textHeight + 10;     // 위로 올림
-					rect.right = WIN_SIZE.x / 2;   // 가로 길이 제한
-					DrawTextA(mdc, now_chat_str, -1, &rect, DT_WORDBREAK | DT_LEFT);
-
-					rect.right = WIN_SIZE.x / 2;   // 가로 길이 제한
-					SetBkMode(mdc, TRANSPARENT);
-					// 내가 치고 있는 채팅 위로 직전 채팅
-					DrawTextA(mdc, chat_str, -1, &rect, DT_WORDBREAK | DT_LEFT | DT_CALCRECT);
-					textHeight = rect.bottom - rect.top; // 텍스트의 높이
-					rect.top -= textHeight + 10;     // 위로 올림
-					rect.right = WIN_SIZE.x / 2;   // 가로 길이 제한
-					DrawTextA(mdc, chat_str, -1, &rect, DT_WORDBREAK | DT_LEFT);
+					DrawTextA(mdc, p.second.name, -1, &rect, DT_WORDBREAK | DT_NOCLIP | DT_CENTER);
 
 					SelectObject(mdc, OldFont);
 					DeleteObject(hFont);
 				}
-
-				BitBlt(hdc, 0, 0, window.right, window.bottom, mdc, 0, 0, SRCCOPY);
-
-				DeleteObject(HBitmap);
-				DeleteDC(mdc);
-				EndPaint(hWnd, &ps);
 			}
+
+			for (int y = my_info.y - VIEW_RANGE; y < my_info.y + VIEW_RANGE; ++y) {
+				for (int x = my_info.x - VIEW_RANGE; x < my_info.x + VIEW_RANGE; ++x) {
+					if (w_map[y][x] == MI_FREE) continue;
+					if (y < 0 || y >= W_HEIGHT || x < 0 || x >= W_WIDTH) continue;
+					switch (w_map[y][x])
+					{
+					case MI_SOILD_WALL:
+					case MI_CRACK_WALL:
+					case MI_ITEM: {
+						wall_img.Draw(mdc, ((10 - (my_info.x - x)) * (TILE_SIZE)) + 5, ((10 - (my_info.y - y)) * (TILE_SIZE)) + 5, TILE_SIZE - 10, TILE_SIZE - 10, (int(w_map[y][x]) - 1) * 31, 0, 31, 25);
+						break;
+					}
+					default:
+						break;
+					}
+				}
+			}
+
+			// 이펙트
+			for (const auto& e : effect) {
+				effect_img.Draw(mdc, ((10 - (my_info.x - e.x)) * (TILE_SIZE)) + 5, ((10 - (my_info.y - e.y)) * (TILE_SIZE)) + 5, TILE_SIZE - 10, TILE_SIZE - 10, (e.motion / 3) * 28, int(e.type) * 28, 28, 28);
+			}
+
+			ch_img.Draw(mdc, (10 * TILE_SIZE) + 5, (10 * TILE_SIZE) + 5, TILE_SIZE - 10, TILE_SIZE - 10, (my_motion / 5) * 28, int(my_info.dir) * 28, 28, 28);
+
+			// 내 HP바
+			for (int i = 1; i <= my_info.max_hp; ++i) {
+				if (i <= my_info.hp)
+					hpbar_img.Draw(mdc, ui_start[US_MY_HP].x + ((i - 1) * 50), ui_start[US_MY_HP].y, 50, 50, 50, 0, 50, 50);
+				else
+					hpbar_img.Draw(mdc, ui_start[US_MY_HP].x + ((i - 1) * 50), ui_start[US_MY_HP].y, 50, 50, 0, 0, 50, 50);
+			}
+			// 마지막으로 때린 놈 HP바
+			if (draw_hpbar_id[0] != -1) {
+				if (draw_hpbar_id[0] < MAX_USER) {
+					for (int i = 1; i <= players[draw_hpbar_id[0]].max_hp; ++i) {
+						if (i <= players[draw_hpbar_id[0]].hp)
+							hpbar_img.Draw(mdc, ui_start[US_TARGET_HP].x + ((i - 1) * 50), ui_start[US_TARGET_HP].y, 50, 50, 100, 0, 50, 50);
+						else
+							hpbar_img.Draw(mdc, ui_start[US_TARGET_HP].x + ((i - 1) * 50), ui_start[US_TARGET_HP].y, 50, 50, 0, 0, 50, 50);
+					}
+				}
+				else {
+					for (int i = 1; i <= players[draw_hpbar_id[0]].max_hp; ++i) {
+						if (i <= players[draw_hpbar_id[0]].hp)
+							hpbar_img.Draw(mdc, ui_start[US_TARGET_HP].x + ((i - 1) * 50), ui_start[US_TARGET_HP].y, 50, 50, 150, 0, 50, 50);
+						else
+							hpbar_img.Draw(mdc, ui_start[US_TARGET_HP].x + ((i - 1) * 50), ui_start[US_TARGET_HP].y, 50, 50, 0, 0, 50, 50);
+					}
+				}
+			}
+
+			// 채팅 그리기
+			{
+				hFont = CreateFont(18, 0, 0, 0, 400, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
+					CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Ramche");
+				OldFont = (HFONT)SelectObject(mdc, hFont);
+				SetTextColor(mdc, RGB(0, 0, 0));
+				SetBkMode(mdc, RGB(255, 255, 255));
+
+				// 출력할 텍스트 설정
+				RECT rect;
+				rect.left = 10;     // 왼쪽 시작 좌표
+				rect.top = WIN_SIZE.y;     // 아래쪽에서 시작
+				rect.right = WIN_SIZE.x / 2;   // 가로 길이 제한
+
+				// 내가 치고 있는 채팅
+				DrawTextA(mdc, now_chat_str, -1, &rect, DT_WORDBREAK | DT_LEFT | DT_CALCRECT);
+				int textHeight = rect.bottom - rect.top; // 텍스트의 높이
+				rect.top -= textHeight + 10;     // 위로 올림
+				rect.right = WIN_SIZE.x / 2;   // 가로 길이 제한
+				DrawTextA(mdc, now_chat_str, -1, &rect, DT_WORDBREAK | DT_LEFT);
+
+				rect.right = WIN_SIZE.x / 2;   // 가로 길이 제한
+				SetBkMode(mdc, TRANSPARENT);
+				// 내가 치고 있는 채팅 위로 직전 채팅
+				DrawTextA(mdc, chat_str, -1, &rect, DT_WORDBREAK | DT_LEFT | DT_CALCRECT);
+				textHeight = rect.bottom - rect.top; // 텍스트의 높이
+				rect.top -= textHeight + 10;     // 위로 올림
+				rect.right = WIN_SIZE.x / 2;   // 가로 길이 제한
+				DrawTextA(mdc, chat_str, -1, &rect, DT_WORDBREAK | DT_LEFT);
+
+				SelectObject(mdc, OldFont);
+				DeleteObject(hFont);
+			}
+
+			BitBlt(hdc, 0, 0, window.right, window.bottom, mdc, 0, 0, SRCCOPY);
+
+			DeleteObject(HBitmap);
+			DeleteDC(mdc);
+			EndPaint(hWnd, &ps);
 			break;
 		}
 		case WM_TIMER: {

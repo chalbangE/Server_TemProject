@@ -235,7 +235,7 @@ void GameManager::Init_NPC()
 }
 void GameManager::Do_npc_random_move(int npc_id)
 {
-	SESSION& npc = clients[npc_id];
+	SESSION* npc = &clients[npc_id];
 	unordered_set<int> old_vl;
 	int s_y = clients[npc_id].y / S_HEIGHT;
 	int s_x = clients[npc_id].x / S_WIDTH;
@@ -247,17 +247,17 @@ void GameManager::Do_npc_random_move(int npc_id)
 			for (auto& j : st_mng.sector_list[y][x]) {
 				if (ST_INGAME != j->_state) continue;
 				if (true == Is_npc(j->_id)) continue;
-				if (true == Can_see(npc._id, j->_id))
+				if (true == Can_see(npc->_id, j->_id))
 					old_vl.insert(j->_id);
 			}
 			st_mng._st_lock[y][x].unlock();
 		}
 	}
 
-	int x = npc.x;
-	int y = npc.y;
-	npc.dir = rand() % 4;
-	switch (npc.dir) {
+	int x = npc->x;
+	int y = npc->y;
+	npc->dir = rand() % 4;
+	switch (npc->dir) {
 	case 0: if (x < (W_WIDTH - 1)) x++; break;
 	case 1: if (x > 0) x--; break;
 	case 2: if (y > 0) y--; break;
@@ -268,16 +268,16 @@ void GameManager::Do_npc_random_move(int npc_id)
 	s_y = y / S_HEIGHT;
 	s_x = x / S_WIDTH;
 
-	if (s_x != npc.x / S_WIDTH || s_y != npc.y / S_HEIGHT) {
-		st_mng.SLErase(&npc);
+	if (s_x != npc->x / S_WIDTH || s_y != npc->y / S_HEIGHT) {
+		st_mng.SLErase(npc);
 
-		npc.x = x;
-		npc.y = y;
-		st_mng.SLInsert(&npc);
+		npc->x = x;
+		npc->y = y;
+		st_mng.SLInsert(npc);
 	}
 
-	npc.x = x;
-	npc.y = y;
+	npc->x = x;
+	npc->y = y;
 
 	unordered_set<int> new_vl;
 	for (int y = s_y - 1; y < s_y + 2; ++y) {
@@ -287,7 +287,7 @@ void GameManager::Do_npc_random_move(int npc_id)
 			for (auto& j : st_mng.sector_list[y][x]) {
 				if (ST_INGAME != j->_state) continue;
 				if (true == Is_npc(j->_id)) continue;
-				if (true == Can_see(npc._id, j->_id))
+				if (true == Can_see(npc->_id, j->_id))
 					new_vl.insert(j->_id);
 			}
 			st_mng._st_lock[y][x].unlock();
@@ -297,20 +297,20 @@ void GameManager::Do_npc_random_move(int npc_id)
 	for (auto pl : new_vl) {
 		if (0 == old_vl.count(pl)) {
 			// 플레이어의 시야에 등장
-			clients[pl].send_add_player_packet(&npc);
+			clients[pl].send_add_player_packet(npc);
 		}
 		else {
 			// 플레이어가 계속 보고 있음.
-			clients[pl].send_move_packet(&npc);
+			clients[pl].send_move_packet(npc);
 		}
 	}
 	///vvcxxccxvvdsvdvds
 	for (auto pl : old_vl) {
 		if (0 == new_vl.count(pl)) {
 			clients[pl]._vl.lock();
-			if (0 != clients[pl]._view_list.count(npc._id)) {
+			if (0 != clients[pl]._view_list.count(npc->_id)) {
 				clients[pl]._vl.unlock();
-				clients[pl].send_remove_player_packet(npc._id);
+				clients[pl].send_remove_player_packet(npc->_id);
 			}
 			else {
 				clients[pl]._vl.unlock();
@@ -365,10 +365,14 @@ void GameManager::Process_packet(int c_id, char* packet)
 			clients[c_id]._state = ST_INGAME;
 		}
 
+		clients[c_id].hp = 4;
+		clients[c_id].max_hp = 4;
+
 		int s_x = clients[c_id].x / S_WIDTH;
 		int s_y = clients[c_id].y / S_HEIGHT;
 
 		st_mng.SLInsert(&clients[c_id]);
+
 
 		clients[c_id].send_login_info_packet();
 
