@@ -25,6 +25,14 @@ short TILE_IMG_SIZE = (WIN_SIZE.x / TILE_NUMBER) * 2;
 
 constexpr char SERVER_ADDR[] = "127.0.0.1";
 
+enum UI_START {
+	US_MY_HP, US_TARGET_HP, US_PARTY_HP
+};
+enum GAME_STATE {
+	GS_LOGIN, GS_INGAME, GS_DEATH, GS_STOP
+};
+
+GAME_STATE						Game_state{GS_LOGIN};
 short							my_motion;
 unordered_map <int, Player>		players;
 Player							my_info;
@@ -37,11 +45,8 @@ array<int, 3>					draw_hpbar_id{ -1 }; // hp바 그려야하는 애들 id / 직전에 때린 
 char							chat_str[CHAT_SIZE]{};
 char							now_chat_str[CHAT_SIZE]{};
 
-enum UI_START {
-	US_MY_HP, US_TARGET_HP, US_PARTY_HP
-};
 
-void Client_Login();
+void Client_Login(char* name);
 void Send_Packet(void* packet);
 void CALLBACK send_callback(DWORD err, DWORD sent_size, LPWSAOVERLAPPED pwsaover, DWORD sendflag);
 void Recv_Packet();
@@ -116,321 +121,386 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 	HFONT hFont, OldFont;
 	RECT window{ 0, 0, 840, 840 };
 
-	static CImage ch_img, npc_img, other_ch_img, effect_img, hpbar_img, wall_img;
+	static CImage ch_img, npc_img, other_ch_img, effect_img, hpbar_img, wall_img, login_bg_img;
 	static array<CImage, 2> bg_tile_img;
 
+	static char name_str[NAME_SIZE]{};
 	static bool control_on = false, chat_on = false;
 
 	const wchar_t* fontPath = L"Ramche.ttf";
 	AddFontResource(fontPath);
 
 	// 메세지 처리하기
-	switch (uMsg) {
-	case WM_CREATE: {
-		AdjustWindowRect(&window, WS_OVERLAPPEDWINDOW, false);         
-		MoveWindow(hWnd, 150, 70, window.right - window.left, window.bottom - window.top, false);
 
-		if (ch_img.IsNull()) {
-			bg_tile_img[0].Load(TEXT("IMG/Tile_1.png"));
-			bg_tile_img[1].Load(TEXT("IMG/Tile_2.png"));
-			ch_img.Load(TEXT("IMG/player28-28.png"));
-			other_ch_img.Load(TEXT("IMG/other-player28-28.png"));
-			npc_img.Load(TEXT("IMG/npc28-28.png"));
-			effect_img.Load(TEXT("IMG/Effect28-28.png"));
-			hpbar_img.Load(TEXT("IMG/Hpbar50-50.png"));
-			wall_img.Load(TEXT("IMG/wall31-25.png"));
-			// wall_img.Load(TEXT("IMG/Login.png")); // 212 584
+	if (Game_state == GS_LOGIN) {
+		switch (uMsg) {
+		case WM_CREATE: {
+			AdjustWindowRect(&window, WS_OVERLAPPEDWINDOW, false);
+			MoveWindow(hWnd, 150, 70, window.right - window.left, window.bottom - window.top, false);
+
+			if (ch_img.IsNull()) {
+				bg_tile_img[0].Load(TEXT("IMG/Tile_1.png"));
+				bg_tile_img[1].Load(TEXT("IMG/Tile_2.png"));
+				ch_img.Load(TEXT("IMG/player28-28.png"));
+				other_ch_img.Load(TEXT("IMG/other-player28-28.png"));
+				npc_img.Load(TEXT("IMG/npc28-28.png"));
+				effect_img.Load(TEXT("IMG/Effect28-28.png"));
+				hpbar_img.Load(TEXT("IMG/Hpbar50-50.png"));
+				wall_img.Load(TEXT("IMG/wall31-25.png"));
+				login_bg_img.Load(TEXT("IMG/Login.png")); // 212 584
+			}
+
+			ui_start[US_TARGET_HP] = { 10, 10 };
+			break;
 		}
+		case WM_PAINT: {
+			if (my_info.id != -1) {
+				hdc = BeginPaint(hWnd, &ps);
+				mdc = CreateCompatibleDC(hdc);
+				HBitmap = CreateCompatibleBitmap(hdc, window.right, window.bottom);
+				OldBitmap = (HBITMAP)SelectObject(mdc, (HBITMAP)HBitmap);
+				FillRect(mdc, &window, 0);
 
-		Client_Login();
-		ui_start[US_TARGET_HP] = { 10, 10 };
+				login_bg_img.Draw(mdc, 0, 0, WIN_SIZE.x, WIN_SIZE.y, 0, 0, WIN_SIZE.x, WIN_SIZE.y);
 
-		SetTimer(hWnd, 2, 10, 0);
-		break;
-	}
-	case WM_SIZE:
-	case WM_MOVE: {
+				// 채팅 그리기
+				{
+					hFont = CreateFont(25, 0, 0, 0, 400, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
+						CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Ramche");
+					OldFont = (HFONT)SelectObject(mdc, hFont);
+					SetTextColor(mdc, RGB(0, 0, 0));
+					SetBkMode(mdc, RGB(255, 255, 255));
 
-		break;
-	}
-	case WM_PAINT: {
-		if (my_info.id != -1) {
-			hdc = BeginPaint(hWnd, &ps);
-			mdc = CreateCompatibleDC(hdc);
-			HBitmap = CreateCompatibleBitmap(hdc, window.right, window.bottom);
-			OldBitmap = (HBITMAP)SelectObject(mdc, (HBITMAP)HBitmap);
-			FillRect(mdc, &window, 0);
+					// 출력할 텍스트 설정
+					RECT rect;  
+					rect.left = 212;     // 왼쪽 시작 좌표
+					rect.top = 594;     // 아래쪽에서 시작
+					rect.right = WIN_SIZE.x - 212;   // 가로 길이 제한
 
-			// 배경 타일 깔기
-			{
-				if (my_info.x % 2 == my_info.y % 2) {
-					bg_tile_img[0].Draw(mdc, 0, 0, WIN_SIZE.x, WIN_SIZE.x, 0, 0, WIN_SIZE.x, WIN_SIZE.x);
+					// 내가 치고 있는 채팅
+					DrawTextA(mdc, name_str, -1, &rect, DT_SINGLELINE | DT_CENTER);
+
+					SelectObject(mdc, OldFont);
+					DeleteObject(hFont);
 				}
-				else {
-					bg_tile_img[1].Draw(mdc, 0, 0, WIN_SIZE.x, WIN_SIZE.x, 0, 0, WIN_SIZE.x, WIN_SIZE.x);
-				}
 
-				hPen = CreatePen(PS_SOLID, 1, RGB(255, 255, 255));
-				oldPen = (HPEN)SelectObject(mdc, hPen);
-				if (my_info.x < TILE_NUMBER / 2 || my_info.y < TILE_NUMBER / 2) {
-					Rectangle(mdc, 0, 0, ((TILE_NUMBER / 2) - my_info.x) * TILE_SIZE, WIN_SIZE.x); // 세로 네모
-					Rectangle(mdc, 0, 0, WIN_SIZE.x, ((TILE_NUMBER / 2) - my_info.y) * TILE_SIZE); // 가로 네모
-				}
-				if ((W_WIDTH - my_info.x) <= (TILE_NUMBER / 2) || (W_HEIGHT - my_info.y) <= (TILE_NUMBER / 2)) {
-					Rectangle(mdc, ((WIN_SIZE.x / 2) + (W_WIDTH - my_info.x) * TILE_SIZE) - (TILE_SIZE / 2), 0, WIN_SIZE.x, WIN_SIZE.x); // 세로 네모
-					Rectangle(mdc, 0, ((WIN_SIZE.x / 2) + (W_HEIGHT - my_info.y) * TILE_SIZE) - (TILE_SIZE / 2), WIN_SIZE.x, WIN_SIZE.x); // 세로 네모
-				}
-				SelectObject(mdc, oldPen);
-				DeleteObject(hPen);
+				BitBlt(hdc, 0, 0, window.right, window.bottom, mdc, 0, 0, SRCCOPY);
+
+				DeleteObject(HBitmap);
+				DeleteDC(mdc);
+				EndPaint(hWnd, &ps);
 			}
-
-
-			// 그리기 (플레이어)
-			for (const auto& p : players) {
-				if (p.second.id >= MAX_USER)
-					npc_img.Draw(mdc, ((10 - (my_info.x - p.second.x)) * (TILE_SIZE)) + 5, ((10 - (my_info.y - p.second.y)) * (TILE_SIZE)) + 5, TILE_SIZE - 10, TILE_SIZE - 10, (my_motion / 5) * 28, int(p.second.dir) * 28, 28, 28);
-				else if (p.second.id == my_info.id) continue;
-				else other_ch_img.Draw(mdc, ((10 - (my_info.x - p.second.x)) * (TILE_SIZE)) + 5, ((10 - (my_info.y - p.second.y)) * (TILE_SIZE)) + 5, TILE_SIZE - 10, TILE_SIZE - 10, (my_motion / 5) * 28, int(p.second.dir) * 28, 28, 28);
-			}
-
-			for (int y = my_info.y - VIEW_RANGE; y < my_info.y + VIEW_RANGE; ++y) {
-				for (int x = my_info.x - VIEW_RANGE; x < my_info.x + VIEW_RANGE; ++x) {
-					if (w_map[y][x] == MI_FREE) continue;
-					if (y < 0 || y >= W_HEIGHT || x < 0 || x >= W_WIDTH) continue;
-					switch (w_map[y][x])
-					{
-					case MI_SOILD_WALL:
-					case MI_CRACK_WALL:
-					case MI_ITEM: {
-						wall_img.Draw(mdc, ((10 - (my_info.x - x)) * (TILE_SIZE)) + 5, ((10 - (my_info.y - y)) * (TILE_SIZE)) + 5, TILE_SIZE - 10, TILE_SIZE - 10, (int(w_map[y][x]) - 1) * 31, 0, 31, 25);
-						break;
-					}
-					default:
-						break;
-					}
-				}
-			}
-
-			// 이펙트
-			for (const auto& e : effect) {
-				effect_img.Draw(mdc, ((10 - (my_info.x - e.x)) * (TILE_SIZE)) + 5, ((10 - (my_info.y - e.y)) * (TILE_SIZE)) + 5, TILE_SIZE - 10, TILE_SIZE - 10, (e.motion / 3) * 28, int(e.type) * 28, 28, 28);
-			}
-
-			ch_img.Draw(mdc, (10 * TILE_SIZE) + 5, (10 * TILE_SIZE) + 5, TILE_SIZE - 10, TILE_SIZE - 10, (my_motion / 5) * 28, int(my_info.dir) * 28, 28, 28);
-
-			// 내 HP바
-			for (int i = 1; i <= my_info.max_hp; ++i) {
-				if (i <= my_info.hp)
-					hpbar_img.Draw(mdc, ui_start[US_MY_HP].x + ((i - 1) * 50), ui_start[US_MY_HP].y, 50, 50, 50, 0, 50, 50);
-				else
-					hpbar_img.Draw(mdc, ui_start[US_MY_HP].x + ((i - 1) * 50), ui_start[US_MY_HP].y, 50, 50, 0, 0, 50, 50);
-			}
-			// 마지막으로 때린 놈 HP바
-			if (draw_hpbar_id[0] != -1) {
-				if (draw_hpbar_id[0] < MAX_USER) {
-					for (int i = 1; i <= players[draw_hpbar_id[0]].max_hp; ++i) {
-						if (i <= players[draw_hpbar_id[0]].hp)
-							hpbar_img.Draw(mdc, ui_start[US_TARGET_HP].x + ((i - 1) * 50), ui_start[US_TARGET_HP].y, 50, 50, 100, 0, 50, 50);
-						else
-							hpbar_img.Draw(mdc, ui_start[US_TARGET_HP].x + ((i - 1) * 50), ui_start[US_TARGET_HP].y, 50, 50, 0, 0, 50, 50);
-					}
-				}
-				else {
-					for (int i = 1; i <= players[draw_hpbar_id[0]].max_hp; ++i) {
-						if (i <= players[draw_hpbar_id[0]].hp)
-							hpbar_img.Draw(mdc, ui_start[US_TARGET_HP].x + ((i - 1) * 50), ui_start[US_TARGET_HP].y, 50, 50, 150, 0, 50, 50);
-						else
-							hpbar_img.Draw(mdc, ui_start[US_TARGET_HP].x + ((i - 1) * 50), ui_start[US_TARGET_HP].y, 50, 50, 0, 0, 50, 50);
-					}
-				}
-			}
-
-			// 채팅 그리기
-			{
-				hFont = CreateFont(18, 0, 0, 0, 400, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
-					CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Ramche");
-				OldFont = (HFONT)SelectObject(mdc, hFont);
-				SetTextColor(mdc, RGB(0, 0, 0));
-				SetBkMode(mdc, RGB(255, 255, 255));
-
-				// 출력할 텍스트 설정
-				RECT rect;
-				rect.left = 10;     // 왼쪽 시작 좌표
-				rect.top = WIN_SIZE.y;     // 아래쪽에서 시작
-				rect.right = WIN_SIZE.x / 2;   // 가로 길이 제한
-
-				// 내가 치고 있는 채팅
-				DrawTextA(mdc, now_chat_str, -1, &rect, DT_WORDBREAK | DT_LEFT | DT_CALCRECT);
-				int textHeight = rect.bottom - rect.top; // 텍스트의 높이
-				rect.top -= textHeight + 10;     // 위로 올림
-				rect.right = WIN_SIZE.x / 2;   // 가로 길이 제한
-				DrawTextA(mdc, now_chat_str, -1, &rect, DT_WORDBREAK | DT_LEFT);
-
-				rect.right = WIN_SIZE.x / 2;   // 가로 길이 제한
-				SetBkMode(mdc, TRANSPARENT);
-				// 내가 치고 있는 채팅 위로 직전 채팅
-				DrawTextA(mdc, chat_str, -1, &rect, DT_WORDBREAK | DT_LEFT | DT_CALCRECT);
-				textHeight = rect.bottom - rect.top; // 텍스트의 높이
-				rect.top -= textHeight + 10;     // 위로 올림
-				rect.right = WIN_SIZE.x / 2;   // 가로 길이 제한
-				DrawTextA(mdc, chat_str, -1, &rect, DT_WORDBREAK | DT_LEFT);
-
-				SelectObject(mdc, OldFont);
-				DeleteObject(hFont);
-			}
-
-			BitBlt(hdc, 0, 0, window.right, window.bottom, mdc, 0, 0, SRCCOPY);
-
-			DeleteObject(HBitmap);
-			DeleteDC(mdc);
-			EndPaint(hWnd, &ps);
+			break;
 		}
-		break;
-	}
-	case WM_TIMER: {
+		case WM_CHAR: {
+			if (wParam == VK_BACK) {
+				int len = strlen(name_str);
+				if (len > 0)
+					name_str[len - 1] = '\0';  // 마지막 문자 제거
+			}
+			else if (wParam == VK_RETURN) {
+				Client_Login(name_str);
 
-		switch (wParam)
-		{
-		case 2: {
-			++my_motion;
-			if (my_motion > 15)
-				my_motion = 0;
+				SetTimer(hWnd, 2, 10, 0);
 
-			for (int i = 0; i < effect.size(); ++i) {
-				effect[i].EF_Motion_Plus();
-
-				if (effect[i].motion == -1) {
-					effect.erase(effect.begin() + i);
-					--i;
-				}
+				Game_state = GS_INGAME;
+			}
+			else if (strlen(name_str) < NAME_SIZE - 1) { // 공간이 남아 있을 때만 추가 
+				int len = strlen(name_str);
+				name_str[len] = (TCHAR)wParam;
+				name_str[len + 1] = '\0';  // 문자열 끝에 null 문자 추가
 			}
 
 			InvalidateRect(hWnd, NULL, FALSE);
 			break;
 		}
-		default:
+		}
+	}
+	else if (Game_state == GS_INGAME) {
+		switch (uMsg) {
+		case WM_SIZE:
+		case WM_MOVE: {
+
 			break;
 		}
-		break;
-	}
-	case WM_KEYDOWN: {
-		//direction |  // 0 : RIGHT, 1 : LEFT, 2 : UP, 3 : DOWN
-		char direction = -1;
-      
-		if (chat_on) {
-			if (wParam == VK_BACK) {
-				int len = strlen(now_chat_str);
-				if (len > 0)
-					now_chat_str[len - 1] = '\0';  // 마지막 문자 제거
+		case WM_PAINT: {
+			if (my_info.id != -1) {
+				hdc = BeginPaint(hWnd, &ps);
+				mdc = CreateCompatibleDC(hdc);
+				HBitmap = CreateCompatibleBitmap(hdc, window.right, window.bottom);
+				OldBitmap = (HBITMAP)SelectObject(mdc, (HBITMAP)HBitmap);
+				FillRect(mdc, &window, 0);
+
+				// 배경 타일 깔기
+				{
+					if (my_info.x % 2 == my_info.y % 2) {
+						bg_tile_img[0].Draw(mdc, 0, 0, WIN_SIZE.x, WIN_SIZE.x, 0, 0, WIN_SIZE.x, WIN_SIZE.x);
+					}
+					else {
+						bg_tile_img[1].Draw(mdc, 0, 0, WIN_SIZE.x, WIN_SIZE.x, 0, 0, WIN_SIZE.x, WIN_SIZE.x);
+					}
+
+					hPen = CreatePen(PS_SOLID, 1, RGB(255, 255, 255));
+					oldPen = (HPEN)SelectObject(mdc, hPen);
+					if (my_info.x < TILE_NUMBER / 2 || my_info.y < TILE_NUMBER / 2) {
+						Rectangle(mdc, 0, 0, ((TILE_NUMBER / 2) - my_info.x) * TILE_SIZE, WIN_SIZE.x); // 세로 네모
+						Rectangle(mdc, 0, 0, WIN_SIZE.x, ((TILE_NUMBER / 2) - my_info.y) * TILE_SIZE); // 가로 네모
+					}
+					if ((W_WIDTH - my_info.x) <= (TILE_NUMBER / 2) || (W_HEIGHT - my_info.y) <= (TILE_NUMBER / 2)) {
+						Rectangle(mdc, ((WIN_SIZE.x / 2) + (W_WIDTH - my_info.x) * TILE_SIZE) - (TILE_SIZE / 2), 0, WIN_SIZE.x, WIN_SIZE.x); // 세로 네모
+						Rectangle(mdc, 0, ((WIN_SIZE.x / 2) + (W_HEIGHT - my_info.y) * TILE_SIZE) - (TILE_SIZE / 2), WIN_SIZE.x, WIN_SIZE.x); // 세로 네모
+					}
+					SelectObject(mdc, oldPen);
+					DeleteObject(hPen);
+				}
+
+
+				// 그리기 (플레이어)
+				for (const auto& p : players) {
+					if (p.second.id >= MAX_USER)
+						npc_img.Draw(mdc, ((10 - (my_info.x - p.second.x)) * (TILE_SIZE)) + 5, ((10 - (my_info.y - p.second.y)) * (TILE_SIZE)) + 5, TILE_SIZE - 10, TILE_SIZE - 10, (my_motion / 5) * 28, int(p.second.dir) * 28, 28, 28);
+					else if (p.second.id == my_info.id) continue;
+					else other_ch_img.Draw(mdc, ((10 - (my_info.x - p.second.x)) * (TILE_SIZE)) + 5, ((10 - (my_info.y - p.second.y)) * (TILE_SIZE)) + 5, TILE_SIZE - 10, TILE_SIZE - 10, (my_motion / 5) * 28, int(p.second.dir) * 28, 28, 28);
+				}
+
+				for (int y = my_info.y - VIEW_RANGE; y < my_info.y + VIEW_RANGE; ++y) {
+					for (int x = my_info.x - VIEW_RANGE; x < my_info.x + VIEW_RANGE; ++x) {
+						if (w_map[y][x] == MI_FREE) continue;
+						if (y < 0 || y >= W_HEIGHT || x < 0 || x >= W_WIDTH) continue;
+						switch (w_map[y][x])
+						{
+						case MI_SOILD_WALL:
+						case MI_CRACK_WALL:
+						case MI_ITEM: {
+							wall_img.Draw(mdc, ((10 - (my_info.x - x)) * (TILE_SIZE)) + 5, ((10 - (my_info.y - y)) * (TILE_SIZE)) + 5, TILE_SIZE - 10, TILE_SIZE - 10, (int(w_map[y][x]) - 1) * 31, 0, 31, 25);
+							break;
+						}
+						default:
+							break;
+						}
+					}
+				}
+
+				// 이펙트
+				for (const auto& e : effect) {
+					effect_img.Draw(mdc, ((10 - (my_info.x - e.x)) * (TILE_SIZE)) + 5, ((10 - (my_info.y - e.y)) * (TILE_SIZE)) + 5, TILE_SIZE - 10, TILE_SIZE - 10, (e.motion / 3) * 28, int(e.type) * 28, 28, 28);
+				}
+
+				ch_img.Draw(mdc, (10 * TILE_SIZE) + 5, (10 * TILE_SIZE) + 5, TILE_SIZE - 10, TILE_SIZE - 10, (my_motion / 5) * 28, int(my_info.dir) * 28, 28, 28);
+
+				// 내 HP바
+				for (int i = 1; i <= my_info.max_hp; ++i) {
+					if (i <= my_info.hp)
+						hpbar_img.Draw(mdc, ui_start[US_MY_HP].x + ((i - 1) * 50), ui_start[US_MY_HP].y, 50, 50, 50, 0, 50, 50);
+					else
+						hpbar_img.Draw(mdc, ui_start[US_MY_HP].x + ((i - 1) * 50), ui_start[US_MY_HP].y, 50, 50, 0, 0, 50, 50);
+				}
+				// 마지막으로 때린 놈 HP바
+				if (draw_hpbar_id[0] != -1) {
+					if (draw_hpbar_id[0] < MAX_USER) {
+						for (int i = 1; i <= players[draw_hpbar_id[0]].max_hp; ++i) {
+							if (i <= players[draw_hpbar_id[0]].hp)
+								hpbar_img.Draw(mdc, ui_start[US_TARGET_HP].x + ((i - 1) * 50), ui_start[US_TARGET_HP].y, 50, 50, 100, 0, 50, 50);
+							else
+								hpbar_img.Draw(mdc, ui_start[US_TARGET_HP].x + ((i - 1) * 50), ui_start[US_TARGET_HP].y, 50, 50, 0, 0, 50, 50);
+						}
+					}
+					else {
+						for (int i = 1; i <= players[draw_hpbar_id[0]].max_hp; ++i) {
+							if (i <= players[draw_hpbar_id[0]].hp)
+								hpbar_img.Draw(mdc, ui_start[US_TARGET_HP].x + ((i - 1) * 50), ui_start[US_TARGET_HP].y, 50, 50, 150, 0, 50, 50);
+							else
+								hpbar_img.Draw(mdc, ui_start[US_TARGET_HP].x + ((i - 1) * 50), ui_start[US_TARGET_HP].y, 50, 50, 0, 0, 50, 50);
+						}
+					}
+				}
+
+				// 채팅 그리기
+				{
+					hFont = CreateFont(18, 0, 0, 0, 400, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
+						CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Ramche");
+					OldFont = (HFONT)SelectObject(mdc, hFont);
+					SetTextColor(mdc, RGB(0, 0, 0));
+					SetBkMode(mdc, RGB(255, 255, 255));
+
+					// 출력할 텍스트 설정
+					RECT rect;
+					rect.left = 10;     // 왼쪽 시작 좌표
+					rect.top = WIN_SIZE.y;     // 아래쪽에서 시작
+					rect.right = WIN_SIZE.x / 2;   // 가로 길이 제한
+
+					// 내가 치고 있는 채팅
+					DrawTextA(mdc, now_chat_str, -1, &rect, DT_WORDBREAK | DT_LEFT | DT_CALCRECT);
+					int textHeight = rect.bottom - rect.top; // 텍스트의 높이
+					rect.top -= textHeight + 10;     // 위로 올림
+					rect.right = WIN_SIZE.x / 2;   // 가로 길이 제한
+					DrawTextA(mdc, now_chat_str, -1, &rect, DT_WORDBREAK | DT_LEFT);
+
+					rect.right = WIN_SIZE.x / 2;   // 가로 길이 제한
+					SetBkMode(mdc, TRANSPARENT);
+					// 내가 치고 있는 채팅 위로 직전 채팅
+					DrawTextA(mdc, chat_str, -1, &rect, DT_WORDBREAK | DT_LEFT | DT_CALCRECT);
+					textHeight = rect.bottom - rect.top; // 텍스트의 높이
+					rect.top -= textHeight + 10;     // 위로 올림
+					rect.right = WIN_SIZE.x / 2;   // 가로 길이 제한
+					DrawTextA(mdc, chat_str, -1, &rect, DT_WORDBREAK | DT_LEFT);
+
+					SelectObject(mdc, OldFont);
+					DeleteObject(hFont);
+				}
+
+				BitBlt(hdc, 0, 0, window.right, window.bottom, mdc, 0, 0, SRCCOPY);
+
+				DeleteObject(HBitmap);
+				DeleteDC(mdc);
+				EndPaint(hWnd, &ps);
 			}
-			else if (wParam == VK_RETURN) {
-				chat_on = false;
-				if (0 == strlen(now_chat_str)) break;
-				CS_CHAT_PACKET p;
-				strcpy_s(p.mess, CHAT_SIZE, now_chat_str);
-				memset(now_chat_str, '\0', sizeof(now_chat_str));
+			break;
+		}
+		case WM_TIMER: {
+
+			switch (wParam)
+			{
+			case 2: {
+				++my_motion;
+				if (my_motion > 15)
+					my_motion = 0;
+
+				for (int i = 0; i < effect.size(); ++i) {
+					effect[i].EF_Motion_Plus();
+
+					if (effect[i].motion == -1) {
+						effect.erase(effect.begin() + i);
+						--i;
+					}
+				}
+
+				InvalidateRect(hWnd, NULL, FALSE);
+				break;
+			}
+			default:
+				break;
+			}
+			break;
+		}
+		case WM_KEYDOWN: {
+			//direction |  // 0 : RIGHT, 1 : LEFT, 2 : UP, 3 : DOWN
+			char direction = -1;
+
+			if (chat_on) {
+				if (wParam == VK_BACK) {
+					int len = strlen(now_chat_str);
+					if (len > 0)
+						now_chat_str[len - 1] = '\0';  // 마지막 문자 제거
+				}
+				else if (wParam == VK_RETURN) {
+					chat_on = false;
+					if (0 == strlen(now_chat_str)) break;
+					CS_CHAT_PACKET p;
+					strcpy_s(p.mess, CHAT_SIZE, now_chat_str);
+					memset(now_chat_str, '\0', sizeof(now_chat_str));
+					p.size = sizeof(p);
+					p.type = CS_CHAT;
+
+					Send_Packet(&p);
+				}
+				break;
+			}
+
+			switch (wParam) {
+			case VK_CONTROL: {
+				control_on = true;
+				break;
+			}
+			case VK_RETURN: {
+				chat_on = true;
+				break;
+			}
+			case 'd':
+			case 'D': {
+				direction = 0;
+				break;
+			}
+			case 'a':
+			case 'A': {
+				direction = 1;
+				break;
+			}
+			case 'w':
+			case 'W': {
+				direction = 2;
+				break;
+			}
+			case 's':
+			case 'S': {
+				direction = 3;
+				break;
+			}
+			}
+
+			if (-1 != direction) {
+				my_info.dir = direction;
+				CS_MOVE_PACKET p;
 				p.size = sizeof(p);
-				p.type = CS_CHAT;
+				p.type = CS_MOVE;
+				if (control_on)
+					direction += 4;
+				p.direction = direction;
 
 				Send_Packet(&p);
 			}
 			break;
 		}
+		case WM_KEYUP: {
+			switch (wParam) {
+			case VK_CONTROL: {
+				control_on = false;
+				break;
+			}
+			}
+			break;
+		}
+		case WM_CHAR: {
+			if (strlen(now_chat_str) < CHAT_SIZE - 1 && chat_on) { // 공간이 남아 있을 때만 추가 
+				if (wParam == VK_RETURN || wParam == VK_BACK) break;
+				int len = strlen(now_chat_str);
+				now_chat_str[len] = (TCHAR)wParam;
+				now_chat_str[len + 1] = '\0';  // 문자열 끝에 null 문자 추가
+			}
+			break;
+		}
+		case WM_LBUTTONUP: {
 
-		switch (wParam) {
-		case VK_CONTROL: {
-			control_on = true;
-			break;
-		} 
-		case VK_RETURN: {
-			chat_on = true;
-			break;
-		}
-		case 'd':
-		case 'D': {
-			direction = 0;
-			break;
-		}
-		case 'a':
-		case 'A': {
-			direction = 1;
-			break;
-		}
-		case 'w': 
-		case 'W': {
-			direction = 2;
-			break;
-		}
-		case 's':
-		case 'S': {
-			direction = 3;
-			break;
-		}
-		}		
-		
-		if (-1 != direction) {
-			my_info.dir = direction;
-			CS_MOVE_PACKET p;
-			p.size = sizeof(p);
-			p.type = CS_MOVE;
-			if (control_on)
-				direction += 4;
-			p.direction = direction;
+			if (1) { // 게임 중이라는 표시 해주기
+				CS_ATTACK_PACKET p;
+				p.size = sizeof(p);
+				p.type = CS_ATTACK;
+				p.direction = my_info.dir;
 
-			Send_Packet(&p);
-		}
-		break;
-	}
-	case WM_KEYUP: {
-		switch (wParam) {
-		case VK_CONTROL: {
-			control_on = false;
+				Send_Packet(&p);
+			}
+
 			break;
 		}
+		case WM_DESTROY: {
+			WSACleanup();
+			PostQuitMessage(0);
+			break;
 		}
-		break;
-	}
-	case WM_CHAR: {
-		if (strlen(now_chat_str) < CHAT_SIZE - 1 && chat_on) { // 공간이 남아 있을 때만 추가 
-			if (wParam == VK_RETURN || wParam == VK_BACK) break;
-			int len = strlen(now_chat_str);
-			now_chat_str[len] = (TCHAR)wParam;
-			now_chat_str[len + 1] = '\0';  // 문자열 끝에 null 문자 추가
+		default:
+			break;
 		}
-		break;
-	}
-	case WM_LBUTTONUP: {
-
-		if (1) { // 게임 중이라는 표시 해주기
-			CS_ATTACK_PACKET p;
-			p.size = sizeof(p);
-			p.type = CS_ATTACK;
-			p.direction = my_info.dir;
-
-			Send_Packet(&p);
-		}
-
-		break;
-	}
-	case WM_DESTROY: {
-		WSACleanup();
-		PostQuitMessage(0);
-		break;
-	}
-	default:
-		break;
 	}
 
 	return DefWindowProc(hWnd, uMsg, wParam, IParam);
 }
 
-void Client_Login()
+void Client_Login(char* name)
 {
 	CS_LOGIN_PACKET p;
 	p.size = sizeof(p);
 	p.type = CS_LOGIN;
-	p.name[0] = 'Y';
-	p.name[1] = '\0';
+	strcpy_s(p.name, NAME_SIZE, name);
 
 	Send_Packet(&p);
 }

@@ -13,6 +13,7 @@
 #include <queue>
 #include <array>
 #include <memory>
+#include "../../CLIENT/protocol.h"
 
 using namespace std;
 using namespace chrono;
@@ -22,12 +23,11 @@ extern HWND		hWnd;
 const static int MAX_TEST = 20000;
 const static int MAX_CLIENTS = MAX_TEST * 2;
 const static int INVALID_ID = -1;
-const static int MAX_PACKET_SIZE = 255;
-const static int MAX_BUFF_SIZE = 255;
+const static int MAX_PACKET_SIZE = CHAT_SIZE * 2;
+const static int MAX_BUFF_SIZE = CHAT_SIZE * 2;
 
 #pragma comment (lib, "ws2_32.lib")
 
-#include "../../CLIENT/protocol.h"
 
 HANDLE g_hiocp;
 
@@ -106,14 +106,14 @@ void DisconnectClient(int ci)
 
 void SendPacket(int cl, void* packet)
 {
-	int psize = reinterpret_cast<unsigned char*>(packet)[0];
-	int ptype = reinterpret_cast<unsigned char*>(packet)[1];
+	WORD* psize = reinterpret_cast<WORD*>(packet);
+	int ptype = reinterpret_cast<unsigned char*>(packet)[2];
 	OverlappedEx* over = new OverlappedEx;
 	over->event_type = OP_SEND;
-	memcpy(over->IOCP_buf, packet, psize);
+	memcpy(over->IOCP_buf, packet, *psize);
 	ZeroMemory(&over->over, sizeof(over->over));
 	over->wsabuf.buf = reinterpret_cast<CHAR*>(over->IOCP_buf);
-	over->wsabuf.len = psize;
+	over->wsabuf.len = *psize;
 	int ret = WSASend(g_clients[cl].client_socket, &over->wsabuf, 1, NULL, 0,
 		&over->over, NULL);
 	if (0 != ret) {
@@ -146,11 +146,15 @@ void ProcessPacket(int ci, unsigned char packet[])
 		}
 	}
 					   break;
-	case SC_ADD_OBJECT: break;
-	case SC_REMOVE_OBJECT: break;
-	case SC_CHAT: break;
-	case SC_LOGIN_INFO:
-	{
+	case SC_ADD_OBJECT: 
+	case SC_REMOVE_OBJECT:
+	case SC_CHAT:
+	case SC_STAT_CHANGE:
+	case SC_HP_UPDATE:
+	case SC_ATTACK_OBJECT:
+	case SC_DEATH:
+	case SC_CHANGE_MAP: break;
+	case SC_LOGIN_INFO: {
 		g_clients[ci].connected = true;
 		active_clients++;
 		SC_LOGIN_INFO_PACKET* login_packet = reinterpret_cast<SC_LOGIN_INFO_PACKET*>(packet);
