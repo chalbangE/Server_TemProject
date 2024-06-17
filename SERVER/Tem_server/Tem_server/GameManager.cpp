@@ -431,6 +431,9 @@ void GameManager::Process_packet(int c_id, char* packet)
 			x = clients[c_id].x;
 			y = clients[c_id].y;
 		}
+		else if (w_map_mng.map[y][x] == MI_ITEM) {
+			clients[c_id].hp_change(1);
+		}
 
 		if (p->direction > 3)
 			p->direction -= 4;
@@ -574,15 +577,15 @@ void GameManager::Process_packet(int c_id, char* packet)
 						cl->send_change_map_packet(attack.x, attack.y, w_map_mng.map[attack.y][attack.x]);
 					}
 					else if (cl->x == attack.x && cl->y == attack.y) {
-						--cl->hp;
-						cout << cl->hp << endl;
+						cl->hp_change(-1);
 						if (cl->hp <= 0) {
-							cl->_s_lock.lock();
-							cl->_state = ST_FREE;
-							cl->_s_lock.unlock();
 							clients[c_id].send_death_player_packet(cl);
 							if (Is_player(cl->_id))
 								cl->send_death_player_packet(cl);
+							else {
+								lock_guard<mutex> ll(cl->_s_lock);
+								cl->_state = ST_FREE;
+							}
 						}
 						else {
 							clients[c_id].send_hp_update_packet(cl, c_id);
@@ -610,6 +613,42 @@ void GameManager::Process_packet(int c_id, char* packet)
 				for (auto& cl : st_mng.sector_list[y][x]) {
 					if (cl->_state != ST_INGAME) continue;
 					cl->send_chat_packet(c_id, p->mess);
+				}
+				st_mng._st_lock[y][x].unlock();
+			}
+		}
+		break;
+	}
+	case CS_RESPAWN: {
+		CS_RESPAWN_PACKET* p = reinterpret_cast<CS_RESPAWN_PACKET*>(packet);
+
+		clients[c_id].hp = clients[c_id].max_hp;
+
+		clients[c_id].x = p->x;
+		clients[c_id].y = p->y;
+
+		int s_x = clients[c_id].x / S_WIDTH;
+		int s_y = clients[c_id].y / S_HEIGHT;
+
+		clients[c_id].send_respawn_packet(c_id);
+		// 주변 적이나 플레이어 정보 등록
+		for (int y = s_y - 1; y < s_y + 2; ++y) {
+			for (int x = s_x - 1; x < s_x + 2; ++x) {
+				if (y < 0 || y >= (W_HEIGHT / S_HEIGHT) + 1 || x < 0 || x >= (W_WIDTH / S_WIDTH) + 1) continue;
+				st_mng._st_lock[y][x].lock();
+				for (auto& cl : st_mng.sector_list[y][x]) {
+					{
+						lock_guard<mutex> ll(cl->_s_lock);
+						if (ST_INGAME != cl->_state) continue;
+					}
+					if (cl->_id == c_id) continue;
+					if (false == Can_see(c_id, cl->_id)) continue;
+					if (Is_player(cl->_id)) {
+						cl->send_add_player_packet(&clients[c_id]);
+						cl->send_respawn_packet(c_id);
+					}
+					else WakeUpNPC(cl->_id, c_id);
+					clients[c_id].send_add_player_packet(cl);
 				}
 				st_mng._st_lock[y][x].unlock();
 			}

@@ -5,10 +5,10 @@ constexpr int NAME_SIZE				= 20;
 constexpr int CHAT_SIZE				= 300;
 
 constexpr int MAX_USER				= 10000;
-constexpr int MAX_NPC				= 100;
+constexpr int MAX_NPC				= 50;
 
-constexpr int W_WIDTH				= 200;
-constexpr int W_HEIGHT				= 200;
+constexpr int W_WIDTH				= 50;
+constexpr int W_HEIGHT				= 50;
 
 constexpr int S_WIDTH				= 20;
 constexpr int S_HEIGHT				= 20;
@@ -21,7 +21,8 @@ constexpr char CS_MOVE				= 1;
 constexpr char CS_CHAT				= 2;
 constexpr char CS_ATTACK			= 3;			// 4 방향 공격
 constexpr char CS_TELEPORT			= 4;			// RANDOM한 위치로 Teleport, Stress Test할 때 Hot Spot현상을 피하기 위해 구현
-constexpr char CS_LOGOUT			= 5;			// 클라이언트에서 정상적으로 접속을 종료하는 패킷
+constexpr char CS_LOGOUT			= 5;			// RANDOM한 위치로 Teleport, Stress Test할 때 Hot Spot현상을 피하기 위해 구현
+constexpr char CS_RESPAWN			= 6;			// 클라이언트에서 정상적으로 접속을 종료하는 패킷
 
 constexpr char SC_LOGIN_INFO		= 2;
 constexpr char SC_LOGIN_FAIL		= 3;
@@ -34,6 +35,7 @@ constexpr char SC_HP_UPDATE			= 9;
 constexpr char SC_ATTACK_OBJECT		= 10;
 constexpr char SC_DEATH				= 11;
 constexpr char SC_CHANGE_MAP		= 12;
+constexpr char SC_RESPAWN			= 13;
 
 #pragma pack (push, 1)
 struct CS_LOGIN_PACKET {
@@ -69,6 +71,12 @@ struct CS_ATTACK_PACKET {
 	unsigned short	size;
 	char			type;
 	char			direction;  // 0 : UP, 1 : DOWN, 2 : LEFT, 3 : RIGHT
+};
+
+struct CS_RESPAWN_PACKET {
+	unsigned short	size;
+	char			type;
+	short			x, y;
 };
 
 
@@ -130,7 +138,6 @@ struct SC_HP_UPDATE_PACKET {
 	int				attack_id;
 	int				id;
 	int				hp;
-	char			hp_uadate_why;
 };
 
 struct SC_STAT_CHANGE_PACKET {
@@ -165,6 +172,12 @@ struct SC_CHANGE_MAP_PACKET {
 	char			what;
 	int				x;
 	int				y;
+};
+
+struct SC_RESPAWN_PACKET {
+	unsigned short	size;
+	char			type;
+	int				id;
 };
 
 #pragma pack (pop)

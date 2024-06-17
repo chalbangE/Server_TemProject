@@ -14,7 +14,7 @@ public:
 	SOCKET								_socket;
 	short								x, y;
 	char								dir;
-	int									hp, max_hp;
+	short								hp, max_hp;
 	char								_name[NAME_SIZE];
 	int									_prev_remain;
 	unordered_set <int>					_view_list;
@@ -28,6 +28,7 @@ public:
 	~SESSION();
 
 	void do_recv();
+	short hp_change(short hp);
 
 	void do_send(void* packet);
 	void send_login_info_packet();
@@ -39,6 +40,7 @@ public:
 	void send_chat_packet(int c_id, const char* mess);
 	void send_remove_player_packet(int c_id);
 	void send_change_map_packet(int x, int y, char what);
+	void send_respawn_packet(int c_id);
 };
 
 

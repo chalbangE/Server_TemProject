@@ -24,6 +24,13 @@ void SESSION::do_recv()
 	WSARecv(_socket, &_recv_over._wsabuf, 1, 0, &recv_flag, &_recv_over._over, 0);
 }
 
+short SESSION::hp_change(short hp_c)
+{
+	hp = hp + hp_c;
+
+	return clamp(int(hp), 0, int(max_hp));
+}
+
 void SESSION::do_send(void* packet)
 {
 	OVER_PLUS* sdata = new OVER_PLUS{ reinterpret_cast<char*>(packet) };
@@ -140,6 +147,15 @@ void SESSION::send_change_map_packet(int x, int y, char what)
 	p.y = y;
 	p.what = what;
 	p.type = SC_CHANGE_MAP;
+	p.size = sizeof(p);
+	do_send(&p);
+}
+
+void SESSION::send_respawn_packet(int c_id)
+{
+	SC_RESPAWN_PACKET p;
+	p.id = c_id;
+	p.type = SC_RESPAWN;
 	p.size = sizeof(p);
 	do_send(&p);
 }

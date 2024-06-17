@@ -672,13 +672,47 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 			if (wParam == VK_SPACE) {
 				Game_state = GS_INGAME;
 
-				rsp.exp = my_info.exp * 0.9;
+				rsp.exp = my_info.exp;
 				rsp.level = my_info.level;
 
 				my_info = rsp;
+				players[my_info.id] = rsp;
+
+				CS_RESPAWN_PACKET p;
+				p.size = sizeof(p);
+				p.type = CS_RESPAWN;
+				p.x = rsp.x;
+				p.y = rsp.y;
+
+				Send_Packet(&p);
 			}
 
 			InvalidateRect(hWnd, NULL, FALSE);
+			break;
+		}
+		case WM_TIMER: {
+			switch (wParam)
+			{
+			case 2: {
+				++my_motion;
+				if (my_motion > 15)
+					my_motion = 0;
+
+				for (int i = 0; i < effect.size(); ++i) {
+					effect[i].EF_Motion_Plus();
+
+					if (effect[i].motion == -1) {
+						effect.erase(effect.begin() + i);
+						--i;
+					}
+				}
+
+				InvalidateRect(hWnd, NULL, FALSE);
+				break;
+			}
+			default:
+				break;
+			}
 			break;
 		}
 		}
@@ -771,8 +805,7 @@ void Using_Packet(char* packet_ptr)
 		
 		strcpy_s(players[my_info.id].name, my_info.name);
 		
-		rsp = { packet->x, packet->y };
-		my_info = players[my_info.id];
+		my_info = rsp = players[my_info.id];
 
 		ui_start[US_MY_HP] = { WIN_SIZE.x - (my_info.max_hp * 50) - 10, WIN_SIZE.y - 60 };
 		break;
@@ -827,37 +860,52 @@ void Using_Packet(char* packet_ptr)
 	case SC_HP_UPDATE: {
 		SC_HP_UPDATE_PACKET* packet = reinterpret_cast<SC_HP_UPDATE_PACKET*>(packet_ptr);
 
-		if (my_info.id == packet->id) {
-			my_info.hp = packet->hp;
-			players[packet->id].hp = packet->hp;
-			break;
-		}
-
 		// 아이템 먹었을 때
 		if (packet->attack_id == -1) {
-			if (players[packet->id].hp < packet->hp) {
-				snprintf(chat_str, sizeof(chat_str), "[시스템] %s가 뭔가 주워먹구 치료!", players[packet->id].name);
-			}
+			snprintf(chat_str, sizeof(chat_str), "[시스템] %s가 뭔가 주워먹구 치료!", players[packet->id].name);
 		}
-		else if (players[packet->id].hp > packet->hp) {
+
+		if (players[packet->id].hp > packet->hp) {
 			// 딜 했을 때
-			draw_hpbar_id[0] = packet->id;
+			if (my_info.id == packet->attack_id)
+				draw_hpbar_id[0] = packet->id;
 			snprintf(chat_str, sizeof(chat_str), "[시스템] %s가 %s에게 얻어맞았다!", players[packet->id].name, players[packet->attack_id].name);
 		}
+		else if (players[packet->id].hp < packet->hp) {
+			snprintf(chat_str, sizeof(chat_str), "[시스템] %s가 뭔가 주워먹구 치료!", players[packet->id].name);
+		}
+
 		players[packet->id].hp = packet->hp;
 
+		if (my_info.id == packet->id) {
+			my_info.hp = packet->hp;
+		}
 		break;
 	}
 	case SC_DEATH: {
 		SC_DEATH_PACKET* packet = reinterpret_cast<SC_DEATH_PACKET*>(packet_ptr);
-
+		
 		players.erase(packet->id);
-		if (packet->id == my_info.id)
+		if (packet->id == my_info.id) {
 			effect.emplace_back(EFFECT_TYPE::ET_P_DEATH, packet->x, packet->y);
-		else if (packet->id < MAX_USER)
+			my_info.hp = 0;
+			Game_state = GS_DEATH;
+			char msg = rand() % 3;
+			if (msg == 0)
+				snprintf(chat_str, sizeof(chat_str), "[시스템] 컨트롤이 부족해서 죽어버렸네요...");
+			else if (msg == 1)
+				snprintf(chat_str, sizeof(chat_str), "[시스템] 죽었다! 실력을 더 길러야겠어요");
+			else if (msg == 2)
+				snprintf(chat_str, sizeof(chat_str), "[시스템] 아... 딱 요 정도?");
+		}
+		else if (packet->id < MAX_USER) {
 			effect.emplace_back(EFFECT_TYPE::ET_OP_DEATH, packet->x, packet->y);
-		else
+			snprintf(chat_str, sizeof(chat_str), "[시스템] %s가 죽었다!", players[packet->id].name);
+		}
+		else {
 			effect.emplace_back(EFFECT_TYPE::ET_NPC_DEATH, packet->x, packet->y);
+			snprintf(chat_str, sizeof(chat_str), "[시스템] %s가 죽었다!", players[packet->id].name);
+		}
 		break;
 	}
 	case SC_ATTACK_OBJECT: {
@@ -878,6 +926,12 @@ void Using_Packet(char* packet_ptr)
 		if (packet->what == MI_ITEM) {
 			// 아이템 여러개 만들지 고민 중
 		}
+		break;
+	}
+	case SC_RESPAWN: {
+		SC_RESPAWN_PACKET* packet = reinterpret_cast<SC_RESPAWN_PACKET*>(packet_ptr);
+
+		snprintf(chat_str, sizeof(chat_str), "[시스템] %s > 부 활 <", players[packet->id].name);
 		break;
 	}
 	default:

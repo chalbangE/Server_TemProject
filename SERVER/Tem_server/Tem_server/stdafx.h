@@ -6,6 +6,7 @@
 #include <thread>
 #include <vector>
 #include <mutex>
+#include <algorithm>
 #include <unordered_set>
 #include <concurrent_priority_queue.h>
 #include "../../../CLIENT/protocol.h"
