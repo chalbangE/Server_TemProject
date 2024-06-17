@@ -416,6 +416,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 				else if (wParam == VK_RETURN) {
 					chat_on = false;
 					if (0 == strlen(now_chat_str)) break;
+
 					CS_CHAT_PACKET p;
 					strcpy_s(p.mess, CHAT_SIZE, now_chat_str);
 					memset(now_chat_str, '\0', sizeof(now_chat_str));
@@ -434,6 +435,17 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 			}
 			case VK_RETURN: {
 				chat_on = true;
+				break;
+			}
+			case VK_SPACE: {
+				for (int i = 0; i < 4; ++i) {
+					CS_ATTACK_PACKET p;
+					p.size = sizeof(p);
+					p.type = CS_ATTACK;
+					p.direction = i;
+
+					Send_Packet(&p);
+				}
 				break;
 			}
 			case 'd':
@@ -491,14 +503,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 		}
 		case WM_LBUTTONUP: {
 
-			if (1) { // 게임 중이라는 표시 해주기
-				CS_ATTACK_PACKET p;
-				p.size = sizeof(p);
-				p.type = CS_ATTACK;
-				p.direction = my_info.dir;
+			CS_ATTACK_PACKET p;
+			p.size = sizeof(p);
+			p.type = CS_ATTACK;
+			p.direction = my_info.dir;
 
-				Send_Packet(&p);
-			}
+			Send_Packet(&p);
 
 			break;
 		}
@@ -885,7 +895,6 @@ void Using_Packet(char* packet_ptr)
 	case SC_DEATH: {
 		SC_DEATH_PACKET* packet = reinterpret_cast<SC_DEATH_PACKET*>(packet_ptr);
 		
-		players.erase(packet->id);
 		if (packet->id == my_info.id) {
 			effect.emplace_back(EFFECT_TYPE::ET_P_DEATH, packet->x, packet->y);
 			my_info.hp = 0;
@@ -906,6 +915,7 @@ void Using_Packet(char* packet_ptr)
 			effect.emplace_back(EFFECT_TYPE::ET_NPC_DEATH, packet->x, packet->y);
 			snprintf(chat_str, sizeof(chat_str), "[시스템] %s가 죽었다!", players[packet->id].name);
 		}
+		players.erase(packet->id);
 		break;
 	}
 	case SC_ATTACK_OBJECT: {
