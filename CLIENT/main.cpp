@@ -249,14 +249,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 			{
 				hFont = CreateFont(18, 0, 0, 0, 400, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
 					CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Ramche");
-				if (!hFont) {
-					DWORD dwError = GetLastError();
-					LPWSTR lpMsgBuf;
-					FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-						NULL, dwError, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR)&lpMsgBuf, 0, NULL);
-					MessageBox(hWnd, lpMsgBuf, L"Font creation failed!", MB_OK | MB_ICONERROR);
-					LocalFree(lpMsgBuf);
-				}
 				OldFont = (HFONT)SelectObject(mdc, hFont);
 				SetTextColor(mdc, RGB(0, 0, 0));
 				SetBkMode(mdc, RGB(255, 255, 255));
