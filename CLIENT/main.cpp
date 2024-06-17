@@ -32,19 +32,21 @@ enum GAME_STATE {
 	GS_LOGIN, GS_INGAME, GS_DEATH, GS_STOP
 };
 
-GAME_STATE						Game_state{GS_LOGIN};
-short							my_motion;
-unordered_map <int, Player>		players;
-Player							my_info;
-Player							rsp;
-SOCKET							send_socket, server_soket;
-WSAOVERLAPPED					wsaover;
-vector<Effect>					effect;
-char							w_map[W_HEIGHT][W_WIDTH]{};
-array<POINT, 3>					ui_start{};
-array<int, 3>					draw_hpbar_id{ -1 }; // hp바 그려야하는 애들 id / 직전에 때린 적, 파티원 1, 파티원 2 순서
-char							chat_str[CHAT_SIZE]{};
-char							now_chat_str[CHAT_SIZE]{};
+GAME_STATE							Game_state{GS_LOGIN};
+short								my_motion;
+unordered_map <int, Player>			players;
+Player								my_info;
+Player								rsp;
+SOCKET								send_socket, server_soket;
+WSAOVERLAPPED						wsaover;
+vector<Effect>						effect;
+char								w_map[W_HEIGHT][W_WIDTH]{};
+array<POINT, 3>						ui_start{};
+array<int, 3>						draw_hpbar_id{ -1 }; // hp바 그려야하는 애들 id / 직전에 때린 적, 파티원 1, 파티원 2 순서
+char								chat_str[CHAT_SIZE]{};
+char								now_chat_str[CHAT_SIZE]{};
+chrono::system_clock::time_point	last_move_time;
+
 
 
 void Client_Login(char* name);
@@ -154,6 +156,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 			}
 
 			ui_start[US_TARGET_HP] = { 10, 10 };
+			last_move_time = chrono::system_clock::now();
 			break;
 		}
 		case WM_PAINT: {
@@ -470,7 +473,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 			}
 			}
 
-			if (-1 != direction) {
+			chrono::system_clock::time_point now = chrono::system_clock::now();
+			if (-1 != direction && last_move_time <= now - 1s) {
 				my_info.dir = direction;
 				CS_MOVE_PACKET p;
 				p.size = sizeof(p);
@@ -480,6 +484,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 				p.direction = direction;
 
 				Send_Packet(&p);
+				last_move_time = now;
 			}
 			break;
 		}
