@@ -270,7 +270,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 
 					// 출력할 텍스트 설정
 					RECT rect;
-					rect.left = (10 - (my_info.x - p.second.x)) * (TILE_SIZE) + 5;     // 왼쪽 시작 좌표
+					rect.left = (my_info.x - p.second.x) * (TILE_SIZE);     // 왼쪽 시작 좌표
 					rect.right = rect.left + TILE_SIZE;   // 가로 길이 제한
 					rect.top = ((10 - (my_info.y - p.second.y)) * (TILE_SIZE)) + TILE_SIZE;    
 					rect.bottom = ((10 - (my_info.y - p.second.y)) * (TILE_SIZE)) + TILE_SIZE + (TILE_SIZE / 2); 

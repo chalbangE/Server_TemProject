@@ -443,6 +443,21 @@ void GameManager::Process_packet(int c_id, char* packet)
 			clients[c_id].x = x;
 			clients[c_id].y = y;
 			st_mng.SLInsert(&clients[c_id]);
+
+			// 맵 정보 등록 (주변 섹터만)
+			for (int l_y = s_y - 1; l_y < s_y + 2; ++l_y) {
+				for (int l_x = s_x - 1; l_x < s_x + 2; ++l_x) {
+					if (l_y < 0 || l_y >= (W_HEIGHT / S_HEIGHT) || l_x < 0 || l_x >= (W_WIDTH / S_WIDTH)) continue;
+					w_map_mng.m_lock[l_y][l_x].lock();
+					for (int y = l_y * S_HEIGHT; y < (l_y + 1) * S_HEIGHT; ++y) {
+						for (int x = l_x * S_WIDTH; x < (l_x + 1) * S_WIDTH; ++x) {
+							if (w_map_mng.map[y][x] == static_cast<char>(MI_FREE)) continue;
+							clients[c_id].send_change_map_packet(x, y, w_map_mng.map[y][x]);
+						}
+					}
+					w_map_mng.m_lock[l_y][l_x].unlock();
+				}
+			}
 		}
 
 		unordered_set<int> near_list;
