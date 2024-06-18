@@ -138,25 +138,14 @@
     <ClCompile Include="TIMER_EVENT.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="npc.lua" />
-  </ItemGroup>
-  <ItemGroup>
     <ClInclude Include="ENUM.h" />
     <ClInclude Include="MapManager.h" />
     <ClInclude Include="OVER_PLUS.h" />
     <ClInclude Include="GameManager.h" />
-    <ClInclude Include="include\lauxlib.h" />
-    <ClInclude Include="include\lua.h" />
-    <ClInclude Include="include\lua.hpp" />
-    <ClInclude Include="include\luaconf.h" />
-    <ClInclude Include="include\lualib.h" />
     <ClInclude Include="SectorManager.h" />
     <ClInclude Include="SESSION.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="TIMER_EVENT.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <Library Include="lua54.lib" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

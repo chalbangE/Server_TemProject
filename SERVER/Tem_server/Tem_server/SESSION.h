@@ -21,8 +21,6 @@ public:
 	mutex								_vl;
 	int									last_move_time;
 	chrono::system_clock::time_point	move_start_time;
-	lua_State*							_L;
-	mutex								_ll;
 
 	SESSION();
 	~SESSION();
