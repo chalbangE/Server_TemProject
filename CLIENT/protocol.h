@@ -5,10 +5,10 @@ constexpr int NAME_SIZE				= 20;
 constexpr int CHAT_SIZE				= 300;
 
 constexpr int MAX_USER				= 10000;
-constexpr int MAX_NPC				= 50;
+constexpr int MAX_NPC				= 200000;
 
-constexpr int W_WIDTH				= 50;
-constexpr int W_HEIGHT				= 50;
+constexpr int W_WIDTH				= 2000;
+constexpr int W_HEIGHT				= 2000;
 
 constexpr int S_WIDTH				= 20;
 constexpr int S_HEIGHT				= 20;
@@ -88,8 +88,8 @@ struct SC_LOGIN_INFO_PACKET {
 	char			type;
 	int				visual;				// 종족, 성별등을 구분할 때 사용
 	int				id;
-	int				hp;
-	int				max_hp;
+	short			hp;
+	short			max_hp;
 	int				exp;
 	int				level;
 	short			x, y;
@@ -162,6 +162,7 @@ struct SC_DEATH_PACKET {
 	unsigned short	size;
 	char			type;
 	int				id;
+	int				attack_id;
 	int				x;
 	int				y;
 };

@@ -14,6 +14,8 @@
 #pragma comment(lib, "WS2_32.lib")
 #pragma comment(lib, "MSWSock.lib")
 #pragma comment(lib, "lua54.lib")
+#include <windows.h>  
+#include <sqlext.h>  
 
 #include "ENUM.h"
 

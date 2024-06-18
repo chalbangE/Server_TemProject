@@ -6,8 +6,8 @@ class Player
 
 public:
 	int				id;
-	int				hp;
-	int				max_hp;
+	short			hp;
+	short			max_hp;
 	int				exp;
 	int				level;
 	short			x, y;

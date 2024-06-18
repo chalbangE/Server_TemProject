@@ -145,7 +145,7 @@ void GameManager::Worker_thread()
 			int s_x = clients[key].x / S_WIDTH;
 			for (int y = s_y - 1; y < s_y + 2; ++y) {
 				for (int x = s_x - 1; x < s_x + 2; ++x) {
-					if (y < 0 || y >= (W_HEIGHT / S_HEIGHT) + 1 || x < 0 || x >= (W_WIDTH / S_WIDTH) + 1) continue;
+					if (y < 0 || y >= (W_HEIGHT / S_HEIGHT) || x < 0 || x >= (W_WIDTH / S_WIDTH)) continue;
 					st_mng._st_lock[y][x].lock();
 					for (auto& j : st_mng.sector_list[y][x]) {
 						if (j->_state != ST_INGAME) continue;
@@ -211,6 +211,29 @@ void GameManager::WakeUpNPC(int npc_id, int waker)
 	timer_queue.push(ev);
 }
 
+void GameManager::Npc_Attacks(SESSION* npc, SESSION* player)
+{
+	player->_vl.lock();
+	unordered_set<int> vlist = player->_view_list;
+	player->_vl.unlock();
+
+	player->hp_change(-1);
+	for (auto& a : vlist) {
+		if (Is_npc(a)) continue;
+		if (player->hp <= 0) 
+			clients[a].send_death_player_packet(player, npc);
+		else 
+			clients[a].send_hp_update_packet(player, npc);
+	}
+
+	if (player->hp <= 0) {
+		player->send_death_player_packet(player, npc);
+	}
+	else
+		player->send_hp_update_packet(player, npc);
+}
+
+
 void GameManager::Init_NPC()
 {
 	cout << "NPC intialize begin.\n";
@@ -242,7 +265,7 @@ void GameManager::Do_npc_random_move(int npc_id)
 
 	for (int y = s_y - 1; y < s_y + 2; ++y) {
 		for (int x = s_x - 1; x < s_x + 2; ++x) {
-			if (y < 0 || y >= (W_HEIGHT / S_HEIGHT) + 1 || x < 0 || x >= (W_WIDTH / S_WIDTH) + 1) continue;
+			if (y < 0 || y >= (W_HEIGHT / S_HEIGHT) || x < 0 || x >= (W_WIDTH / S_WIDTH)) continue;
 			st_mng._st_lock[y][x].lock();
 			for (auto& j : st_mng.sector_list[y][x]) {
 				if (ST_INGAME != j->_state) continue;
@@ -264,6 +287,9 @@ void GameManager::Do_npc_random_move(int npc_id)
 	case 3: if (y < (W_HEIGHT - 1)) y++; break;
 	}
 	if (w_map_mng.map[y][x] == MI_CRACK_WALL || w_map_mng.map[y][x] == MI_SOILD_WALL) return;
+	else if (w_map_mng.map[y][x] == MI_ITEM) {
+		npc->hp_change(1);
+	}
 
 	s_y = y / S_HEIGHT;
 	s_x = x / S_WIDTH;
@@ -282,13 +308,16 @@ void GameManager::Do_npc_random_move(int npc_id)
 	unordered_set<int> new_vl;
 	for (int y = s_y - 1; y < s_y + 2; ++y) {
 		for (int x = s_x - 1; x < s_x + 2; ++x) {
-			if (y < 0 || y >= (W_HEIGHT / S_HEIGHT) + 1 || x < 0 || x >= (W_WIDTH / S_WIDTH) + 1) continue;
+			if (y < 0 || y >= (W_HEIGHT / S_HEIGHT) || x < 0 || x >= (W_WIDTH / S_WIDTH)) continue;
 			st_mng._st_lock[y][x].lock();
 			for (auto& j : st_mng.sector_list[y][x]) {
 				if (ST_INGAME != j->_state) continue;
 				if (true == Is_npc(j->_id)) continue;
 				if (true == Can_see(npc->_id, j->_id))
 					new_vl.insert(j->_id);
+
+				if (j->x == npc->x && j->y == npc->y)
+					Npc_Attacks(npc, j);
 			}
 			st_mng._st_lock[y][x].unlock();
 		}
@@ -302,6 +331,10 @@ void GameManager::Do_npc_random_move(int npc_id)
 		else {
 			// 플레이어가 계속 보고 있음.
 			clients[pl].send_move_packet(npc);
+			if (w_map_mng.map[y][x] == MI_ITEM) {
+				clients[pl].send_hp_update_packet(npc, -1);
+				clients[pl].send_change_map_packet(x, y, MI_FREE);
+			}
 		}
 	}
 	///vvcxxccxvvdsvdvds
@@ -379,7 +412,7 @@ void GameManager::Process_packet(int c_id, char* packet)
 		// 주변 적이나 플레이어 정보 등록
 		for (int y = s_y - 1; y < s_y + 2; ++y) {
 			for (int x = s_x - 1; x < s_x + 2; ++x) {
-				if (y < 0 || y >= (W_HEIGHT / S_HEIGHT) + 1 || x < 0 || x >= (W_WIDTH / S_WIDTH) + 1) continue;
+				if (y < 0 || y >= (W_HEIGHT / S_HEIGHT) || x < 0 || x >= (W_WIDTH / S_WIDTH)) continue;
 				st_mng._st_lock[y][x].lock();
 				for (auto& cl : st_mng.sector_list[y][x]) {
 					{
@@ -437,6 +470,7 @@ void GameManager::Process_packet(int c_id, char* packet)
 
 		if (p->direction > 3)
 			p->direction -= 4;
+		clients[c_id].dir = p->direction;
 		int s_y = y / S_HEIGHT;
 		int s_x = x / S_WIDTH;
 
@@ -470,7 +504,7 @@ void GameManager::Process_packet(int c_id, char* packet)
 
 		for (int y = s_y - 1; y < s_y + 2; ++y) {
 			for (int x = s_x - 1; x < s_x + 2; ++x) {
-				if (y < 0 || y >= (W_HEIGHT / S_HEIGHT) + 1 || x < 0 || x >= (W_WIDTH / S_WIDTH) + 1) continue;
+				if (y < 0 || y >= (W_HEIGHT / S_HEIGHT) || x < 0 || x >= (W_WIDTH / S_WIDTH)) continue;
 				st_mng._st_lock[y][x].lock();
 				for (auto& cl : st_mng.sector_list[y][x]) {
 					if (cl->_state != ST_INGAME) continue;
@@ -512,7 +546,12 @@ void GameManager::Process_packet(int c_id, char* packet)
 					}
 				}
 			}
-			else WakeUpNPC(pl, c_id);
+			else {
+				WakeUpNPC(pl, c_id);
+
+				if (clients[c_id].x == clients[pl].x && clients[c_id].y == clients[pl].y)
+					Npc_Attacks(&clients[pl], &clients[c_id]);
+			}
 
 			if (old_vlist.count(pl) == 0) {
 				clients[c_id].send_add_player_packet(&clients[pl]);
@@ -552,8 +591,8 @@ void GameManager::Process_packet(int c_id, char* packet)
 		case 3: if (attack.y < W_HEIGHT - 1) attack.y++; break;
 		}
 
-		int s_x = clients[c_id].x / S_HEIGHT;
-		int s_y = clients[c_id].y / S_WIDTH;
+		int s_x = attack.x / S_HEIGHT;
+		int s_y = attack.y / S_WIDTH;
 
 		// 부술 수 있는 벽 공격하면 뿌수기
 		bool blocken_wall = false;
@@ -576,22 +615,28 @@ void GameManager::Process_packet(int c_id, char* packet)
 					if (blocken_wall) {
 						cl->send_change_map_packet(attack.x, attack.y, w_map_mng.map[attack.y][attack.x]);
 					}
-					else if (cl->x == attack.x && cl->y == attack.y) {
+					else if (cl->x == attack.x && cl->y == attack.y) { // 공격에 맞은 놈 cl
 						cl->hp_change(-1);
-						if (cl->hp <= 0) {
-							clients[c_id].send_death_player_packet(cl);
-							if (Is_player(cl->_id))
-								cl->send_death_player_packet(cl);
+
+						clients[c_id]._vl.lock();
+						for (auto& a : clients[c_id]._view_list) {
+							if (cl->hp <= 0) {
+								if (Is_player(clients[a]._id))
+									clients[a].send_death_player_packet(cl, &clients[c_id]);
+							}
 							else {
-								lock_guard<mutex> ll(cl->_s_lock);
-								cl->_state = ST_FREE;
+								clients[a].send_hp_update_packet(cl, &clients[c_id]);
+								if (Is_player(cl->_id))
+									cl->send_hp_update_packet(cl, &clients[c_id]);
 							}
 						}
-						else {
-							clients[c_id].send_hp_update_packet(cl, c_id);
-							if (Is_player(cl->_id))
-								cl->send_hp_update_packet(cl, c_id);
+						clients[c_id]._vl.unlock();							
+						
+						if (cl->hp <= 0) {
+							clients[c_id].send_death_player_packet(cl, &clients[c_id]);
 						}
+						else 
+							clients[c_id].send_hp_update_packet(cl, &clients[c_id]);
 					}
 				}
 				st_mng._st_lock[y][x].unlock();
@@ -622,10 +667,10 @@ void GameManager::Process_packet(int c_id, char* packet)
 	case CS_RESPAWN: {
 		CS_RESPAWN_PACKET* p = reinterpret_cast<CS_RESPAWN_PACKET*>(packet);
 
-		clients[c_id].hp = clients[c_id].max_hp;
+		clients[c_id].hp_change(clients[c_id].max_hp);
 
-		int s_x = clients[c_id].x / S_WIDTH;
-		int s_y = clients[c_id].y / S_HEIGHT;
+		int s_x = p->x / S_WIDTH;
+		int s_y = p->y / S_HEIGHT;
 
 		if (s_x != clients[c_id].x / S_WIDTH || s_y != clients[c_id].y / S_HEIGHT) {
 			st_mng.SLErase(&clients[c_id]);
@@ -657,7 +702,7 @@ void GameManager::Process_packet(int c_id, char* packet)
 		// 주변 적이나 플레이어 정보 등록
 		for (int y = s_y - 1; y < s_y + 2; ++y) {
 			for (int x = s_x - 1; x < s_x + 2; ++x) {
-				if (y < 0 || y >= (W_HEIGHT / S_HEIGHT) + 1 || x < 0 || x >= (W_WIDTH / S_WIDTH) + 1) continue;
+				if (y < 0 || y >= (W_HEIGHT / S_HEIGHT) || x < 0 || x >= (W_WIDTH / S_WIDTH)) continue;
 				st_mng._st_lock[y][x].lock();
 				for (auto& cl : st_mng.sector_list[y][x]) {
 					{
@@ -685,4 +730,43 @@ bool GameManager::Can_see(int from, int to)
 {
 	if (abs(clients[from].x - clients[to].x) > VIEW_RANGE) return false;
 	return abs(clients[from].y - clients[to].y) <= VIEW_RANGE;
+}
+
+void GameManager::DataBase() {
+	// Allocate environment handle  
+	retcode = SQLAllocHandle(SQL_HANDLE_ENV, SQL_NULL_HANDLE, &henv);
+
+	cout << "Set the ODBC version environment attribute  " << endl;
+	// Set the ODBC version environment attribute  
+	if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
+		retcode = SQLSetEnvAttr(henv, SQL_ATTR_ODBC_VERSION, (void*)SQL_OV_ODBC3, 0);
+
+		// Allocate connection handle  
+		if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
+			retcode = SQLAllocHandle(SQL_HANDLE_DBC, henv, &hdbc);
+
+			// Set login timeout to 5 seconds  
+			if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
+				SQLSetConnectAttr(hdbc, SQL_LOGIN_TIMEOUT, (SQLPOINTER)5, 0);
+
+				// Connect to data source  
+				retcode = SQLConnect(hdbc, (SQLWCHAR*)L"Server_TermProject_Yum", SQL_NTS, (SQLWCHAR*)NULL, 0, NULL, 0);
+
+				// Allocate statement handle  
+				if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
+					retcode = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);
+
+					// Process data  
+					if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
+						SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
+					}
+
+					SQLDisconnect(hdbc);
+				}
+
+				SQLFreeHandle(SQL_HANDLE_DBC, hdbc);
+			}
+		}
+		SQLFreeHandle(SQL_HANDLE_ENV, henv);
+	}
 }

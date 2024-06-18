@@ -17,6 +17,14 @@ public:
 	SectorManager st_mng;
 	MapManager w_map_mng{};
 
+	SQLHENV henv;
+	SQLHDBC hdbc;
+	SQLHSTMT hstmt;
+	SQLRETURN retcode;
+
+	SQLCHAR* OutConnStr = (SQLCHAR*)malloc(255);
+	SQLSMALLINT* OutConnStrLen = (SQLSMALLINT*)malloc(255);
+
 	GameManager();
 	~GameManager();
 	void S_Bind_Listen();
@@ -31,4 +39,6 @@ public:
 	void Init_NPC();
 	void Do_npc_random_move(int npc_id);
 	void WakeUpNPC(int npc_id, int waker);
+	void Npc_Attacks(SESSION* npc, SESSION* player);
+	void DataBase();
 };

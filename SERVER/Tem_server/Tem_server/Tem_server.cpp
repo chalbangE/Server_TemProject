@@ -7,5 +7,6 @@ GameManager GM;
 
 int main()
 {
+	GM.DataBase();
 	GM.Worker_thread();
 }

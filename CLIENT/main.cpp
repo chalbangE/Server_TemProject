@@ -71,9 +71,8 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevinstance, LPSTR IpszCmdPa
 	SOCKADDR_IN server_addr;
 	server_addr.sin_family = AF_INET;
 	server_addr.sin_port = htons(PORT_NUM);
-	//cout << "연결할 서버의 주소를 입력하세용 : ";
-	//cin >> SERVER_ADDR;
-	strcpy_s(SERVER_ADDR, "127.0.0.1");
+	cout << "연결할 서버의 주소를 입력하세용 : ";
+	cin >> SERVER_ADDR;
 	inet_pton(AF_INET, SERVER_ADDR, &server_addr.sin_addr);
 
 	connect(server_soket, reinterpret_cast<sockaddr*>(&server_addr), sizeof(server_addr));
@@ -477,7 +476,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 			}
 
 			chrono::system_clock::time_point now = chrono::system_clock::now();
-			if (-1 != direction && last_move_time <= now - 0.1s) {
+			if (-1 != direction && last_move_time <= now - 1s) {
 				my_info.dir = direction;
 				CS_MOVE_PACKET p;
 				p.size = sizeof(p);
@@ -501,7 +500,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 			break;
 		}
 		case WM_CHAR: {
-			if (strlen(now_chat_str) < CHAT_SIZE - 1 && chat_on) { // 공간이 남아 있을 때만 추가 
+			if (chat_on && strlen(now_chat_str) < CHAT_SIZE - 1) { // 공간이 남아 있을 때만 추가 
 				if (wParam == VK_RETURN || wParam == VK_BACK) break;
 				int len = strlen(now_chat_str);
 				now_chat_str[len] = (TCHAR)wParam;
@@ -510,7 +509,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM IParam)
 			break;
 		}
 		case WM_LBUTTONUP: {
-
 			CS_ATTACK_PACKET p;
 			p.size = sizeof(p);
 			p.type = CS_ATTACK;
@@ -782,9 +780,6 @@ void CALLBACK recv_callback(DWORD err, DWORD recv_size, LPWSAOVERLAPPED pwsaover
 
 	while (1) {
 		if (recv_size == 0) break; // 남은 데이터가 없으면 끝
-		if (buf[2] == SC_CHAT) {
-			cout << 'd' << endl;
-		}
 		WORD* byte = reinterpret_cast<WORD*>(buf);
 		one_packet_size = *byte; // 패킷 하나 사이즈 등록하기
 		if (one_packet_size > recv_size) { // 패킷 하나 사이즈보다 남은 버퍼 크기가 더 작으면 잘린거니까 save하기
@@ -793,9 +788,6 @@ void CALLBACK recv_callback(DWORD err, DWORD recv_size, LPWSAOVERLAPPED pwsaover
 			break;
 		}
 		memcpy(recv_buf, buf, one_packet_size);
-		if (recv_buf[2] == SC_CHAT) {
-			cout << 'd' << endl;
-		}
 		Using_Packet(recv_buf);
 		buf += one_packet_size;
 		recv_size -= one_packet_size;
@@ -909,20 +901,21 @@ void Using_Packet(char* packet_ptr)
 			Game_state = GS_DEATH;
 			char msg = rand() % 3;
 			if (msg == 0)
-				snprintf(chat_str, sizeof(chat_str), "[시스템] 컨트롤이 부족해서 죽어버렸네요...");
+				snprintf(chat_str, sizeof(chat_str), "[시스템] %s보다 컨트롤이 부족해서 죽어버렸네요...", players[packet->attack_id].name);
 			else if (msg == 1)
-				snprintf(chat_str, sizeof(chat_str), "[시스템] 죽었다! 실력을 더 길러야겠어요");
+				snprintf(chat_str, sizeof(chat_str), "[시스템] %s에게 죽었다! 실력을 더 길러야겠어요", players[packet->attack_id].name);
 			else if (msg == 2)
-				snprintf(chat_str, sizeof(chat_str), "[시스템] 아... 딱 요 정도?");
+				snprintf(chat_str, sizeof(chat_str), "[시스템] %s한테...? 아... 딱 요 정도?", players[packet->attack_id].name);
 		}
 		else if (packet->id < MAX_USER) {
 			effect.emplace_back(EFFECT_TYPE::ET_OP_DEATH, packet->x, packet->y);
-			snprintf(chat_str, sizeof(chat_str), "[시스템] %s가 죽었다!", players[packet->id].name);
+			snprintf(chat_str, sizeof(chat_str), "[시스템] %s에게 %s가 장렬히 패배", players[packet->attack_id].name, players[packet->id].name);
 		}
 		else {
 			effect.emplace_back(EFFECT_TYPE::ET_NPC_DEATH, packet->x, packet->y);
-			snprintf(chat_str, sizeof(chat_str), "[시스템] %s가 죽었다!", players[packet->id].name);
+			snprintf(chat_str, sizeof(chat_str), "[시스템] %s가 %s를 막타쳤다!", players[packet->attack_id].name, players[packet->id].name);
 		}
+
 		players.erase(packet->id);
 		break;
 	}

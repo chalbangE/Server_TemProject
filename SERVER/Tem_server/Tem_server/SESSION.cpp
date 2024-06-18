@@ -52,6 +52,7 @@ void SESSION::send_login_info_packet()
 
 void SESSION::send_move_packet(SESSION* client)
 {
+	if (client->hp <= 0) return;
 	SC_MOVE_OBJECT_PACKET p;
 	p.id = client->_id;
 	p.size = sizeof(SC_MOVE_OBJECT_PACKET);
@@ -65,6 +66,7 @@ void SESSION::send_move_packet(SESSION* client)
 
 void SESSION::send_add_player_packet(SESSION* client)
 {
+	if (client->hp <= 0) return;
 	SC_ADD_OBJECT_PACKET add_packet;
 	add_packet.id = client->_id;
 	strcpy_s(add_packet.name, client->_name);
@@ -80,10 +82,11 @@ void SESSION::send_add_player_packet(SESSION* client)
 	do_send(&add_packet);
 }
 
-void SESSION::send_hp_update_packet(SESSION* client, int at_id)
+void SESSION::send_hp_update_packet(SESSION* client, SESSION* attack)
 {
+	if (attack->hp <= 0) return;
 	SC_HP_UPDATE_PACKET hit_packet;
-	hit_packet.attack_id = at_id;
+	hit_packet.attack_id = attack->_id;
 	hit_packet.id = client->_id;
 	hit_packet.hp = client->hp;
 	hit_packet.size = sizeof(hit_packet);
@@ -91,10 +94,24 @@ void SESSION::send_hp_update_packet(SESSION* client, int at_id)
 	do_send(&hit_packet);
 }
 
-void SESSION::send_death_player_packet(SESSION* client)
+void SESSION::send_hp_update_packet(SESSION* client, int type)
 {
+	if (client->hp <= 0) return;
+	SC_HP_UPDATE_PACKET hit_packet;
+	hit_packet.attack_id = type;
+	hit_packet.id = client->_id;
+	hit_packet.hp = client->hp;
+	hit_packet.size = sizeof(hit_packet);
+	hit_packet.type = SC_HP_UPDATE;
+	do_send(&hit_packet);
+}
+
+void SESSION::send_death_player_packet(SESSION* client, SESSION* attack)
+{
+	if (attack->hp <= 0) return;
 	SC_DEATH_PACKET death_packet;
 	death_packet.id = client->_id;
+	death_packet.attack_id = attack->_id;
 	death_packet.x = client->x;
 	death_packet.y = client->y;
 	death_packet.size = sizeof(death_packet);
