@@ -10,8 +10,10 @@
 #include <unordered_set>
 #include <concurrent_priority_queue.h>
 #include "../../../CLIENT/protocol.h"
+#include "include/lua.hpp"
 #pragma comment(lib, "WS2_32.lib")
 #pragma comment(lib, "MSWSock.lib")
+#pragma comment(lib, "lua54.lib")
 #include <windows.h>  
 #include <sqlext.h>  
 
